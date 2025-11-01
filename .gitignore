@@ -1,3 +1,10 @@
+# vs code
+.vs
+
+# LLM coding
+.augment/
+Laghari
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
