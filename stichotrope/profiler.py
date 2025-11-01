@@ -5,7 +5,10 @@ Provides the main Profiler class with multi-track support, runtime enable/disabl
 and call-site caching.
 """
 
-from typing import Dict, Optional, Tuple
+import functools
+import inspect
+from contextlib import contextmanager
+from typing import Any, Callable, Dict, Optional, Tuple
 from stichotrope.types import ProfileBlock, ProfileTrack, ProfilerResults
 from stichotrope.timing import get_time_ns
 
@@ -183,6 +186,136 @@ class Profiler:
         self._tracks.clear()
         self._track_enabled.clear()
         self._next_block_idx.clear()
+
+    def track(self, track_idx: int, name: Optional[str] = None) -> Callable:
+        """
+        Decorator for profiling functions.
+
+        Example:
+            @profiler.track(0, "process_data")
+            def process_data(data):
+                return transform(data)
+
+            # Auto-detect function name
+            @profiler.track(0)
+            def compute():
+                return result
+
+        Args:
+            track_idx: Track index for this function
+            name: Optional name (defaults to function.__name__)
+
+        Returns:
+            Decorator function
+        """
+        # Level 1: Global enable/disable (zero overhead when disabled)
+        if not _PROFILER_ENABLED:
+            return lambda func: func  # Identity decorator - ZERO overhead
+
+        def decorator(func: Callable) -> Callable:
+            # Use function name if not provided
+            block_name = name if name is not None else func.__name__
+
+            # Get call-site information
+            frame = inspect.currentframe()
+            if frame and frame.f_back:
+                file = frame.f_back.f_code.co_filename
+                line = frame.f_back.f_lineno
+            else:
+                file = "<unknown>"
+                line = 0
+
+            # Check call-site cache
+            cache_key = (track_idx, file, line, block_name)
+            if cache_key in _CALL_SITE_CACHE:
+                profiler_id, block_idx = _CALL_SITE_CACHE[cache_key]
+            else:
+                # Register block and cache
+                block_idx = self._register_block(track_idx, block_name, file, line)
+                _CALL_SITE_CACHE[cache_key] = (self._profiler_id, block_idx)
+
+            # Store block_idx in function attribute for fast access
+            @functools.wraps(func)
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
+                # Level 2: Per-track enable/disable (fast guard)
+                if not self.is_track_enabled(track_idx):
+                    return func(*args, **kwargs)
+
+                # Level 3: Instance start/stop
+                if not self._started:
+                    return func(*args, **kwargs)
+
+                # Profile the function
+                start = get_time_ns()
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                finally:
+                    end = get_time_ns()
+                    elapsed = end - start
+                    self._record_block_time(track_idx, block_idx, elapsed)
+
+            return wrapper
+
+        return decorator
+
+    @contextmanager
+    def block(self, track_idx: int, name: str):
+        """
+        Context manager for profiling code blocks.
+
+        Example:
+            with profiler.block(1, "database_query"):
+                result = query_database()
+
+        Args:
+            track_idx: Track index for this block
+            name: Block name (required)
+
+        Yields:
+            None
+        """
+        # Level 1: Global enable/disable
+        if not _PROFILER_ENABLED:
+            yield
+            return
+
+        # Level 2: Per-track enable/disable
+        if not self.is_track_enabled(track_idx):
+            yield
+            return
+
+        # Level 3: Instance start/stop
+        if not self._started:
+            yield
+            return
+
+        # Get call-site information
+        frame = inspect.currentframe()
+        if frame and frame.f_back:
+            file = frame.f_back.f_code.co_filename
+            line = frame.f_back.f_lineno
+        else:
+            file = "<unknown>"
+            line = 0
+
+        # Check call-site cache
+        cache_key = (track_idx, file, line, name)
+        if cache_key in _CALL_SITE_CACHE:
+            profiler_id, block_idx = _CALL_SITE_CACHE[cache_key]
+        else:
+            # Register block and cache
+            block_idx = self._register_block(track_idx, name, file, line)
+            _CALL_SITE_CACHE[cache_key] = (self._profiler_id, block_idx)
+
+        # Profile the block
+        start = get_time_ns()
+        try:
+            yield
+        finally:
+            end = get_time_ns()
+            elapsed = end - start
+            self._record_block_time(track_idx, block_idx, elapsed)
 
     def __repr__(self) -> str:
         return (
