@@ -317,6 +317,37 @@ class Profiler:
             elapsed = end - start
             self._record_block_time(track_idx, block_idx, elapsed)
 
+    def export_csv(self, filename: str) -> None:
+        """
+        Export profiling results to CSV file.
+
+        Args:
+            filename: Output CSV filename
+        """
+        from stichotrope.export import export_csv
+        results = self.get_results()
+        with open(filename, 'w', newline='') as f:
+            export_csv(results, f)
+
+    def export_json(self, filename: str, indent: int = 2) -> None:
+        """
+        Export profiling results to JSON file.
+
+        Args:
+            filename: Output JSON filename
+            indent: JSON indentation level
+        """
+        from stichotrope.export import export_json
+        results = self.get_results()
+        with open(filename, 'w') as f:
+            export_json(results, f, indent=indent)
+
+    def print_results(self) -> None:
+        """Print profiling results to console in a formatted table."""
+        from stichotrope.export import print_results
+        results = self.get_results()
+        print_results(results)
+
     def __repr__(self) -> str:
         return (
             f"Profiler(name={self._name!r}, tracks={len(self._tracks)}, "

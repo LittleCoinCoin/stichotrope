@@ -23,6 +23,7 @@ Example usage:
 
 from stichotrope.profiler import Profiler, set_global_enabled, is_global_enabled
 from stichotrope.types import ProfileBlock, ProfileTrack, ProfilerResults
+from stichotrope.export import export_csv, export_json, print_results, format_time_ns
 
 try:
     from importlib.metadata import version
@@ -39,5 +40,9 @@ __all__ = [
     "ProfilerResults",
     "set_global_enabled",
     "is_global_enabled",
+    "export_csv",
+    "export_json",
+    "print_results",
+    "format_time_ns",
 ]
 
