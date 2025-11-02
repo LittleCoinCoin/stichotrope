@@ -4,8 +4,9 @@ Pytest configuration for performance tests.
 Provides fixtures and configuration specific to performance benchmarking.
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 def pytest_addoption(parser):
@@ -14,7 +15,7 @@ def pytest_addoption(parser):
         "--baseline-dir",
         action="store",
         default=None,
-        help="Directory to store permanent baseline results (default: use tmp_path)"
+        help="Directory to store permanent baseline results (default: use tmp_path)",
     )
 
 
@@ -22,7 +23,7 @@ def pytest_addoption(parser):
 def performance_baseline_dir():
     """
     Provide the baseline directory for performance measurements.
-    
+
     Returns:
         Path: Path to baselines directory
     """
@@ -35,7 +36,7 @@ def performance_baseline_dir():
 def benchmark_iterations():
     """
     Provide default number of iterations for benchmarks.
-    
+
     Returns:
         int: Number of iterations (30 for statistical significance)
     """
@@ -46,7 +47,7 @@ def benchmark_iterations():
 def regression_threshold():
     """
     Provide regression detection threshold.
-    
+
     Returns:
         float: Threshold in percentage points (1.0 = 1%)
     """
@@ -56,15 +57,7 @@ def regression_threshold():
 def pytest_configure(config):
     """Configure pytest with custom markers for performance tests."""
     config.addinivalue_line(
-        "markers",
-        "slow: marks tests as slow (deselect with '-m \"not slow\"')"
+        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
-    config.addinivalue_line(
-        "markers",
-        "benchmark: marks tests as benchmarks"
-    )
-    config.addinivalue_line(
-        "markers",
-        "regression: marks tests as regression detection tests"
-    )
-
+    config.addinivalue_line("markers", "benchmark: marks tests as benchmarks")
+    config.addinivalue_line("markers", "regression: marks tests as regression detection tests")

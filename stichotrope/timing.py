@@ -7,7 +7,6 @@ Provides high-precision timing mechanisms for profiling code blocks.
 import time
 from typing import Callable
 
-
 # Primary timing function: nanosecond precision wall-clock time
 get_time_ns: Callable[[], int] = time.perf_counter_ns
 
@@ -62,4 +61,3 @@ def measure_timing_overhead(iterations: int = 10000) -> float:
     # Subtract the two timing calls (start and end)
     overhead_per_call = (total_time - 2 * 100) / iterations  # Approximate
     return overhead_per_call
-

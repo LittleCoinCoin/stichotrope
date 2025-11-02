@@ -12,4 +12,3 @@ import pytest
 def test_placeholder():
     """Placeholder test to maintain test directory structure."""
     pass
-

@@ -5,7 +5,7 @@ Defines ProfileBlock, ProfileTrack, and ProfilerResults for organizing profiling
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Optional
 
 
 @dataclass
@@ -74,7 +74,7 @@ class ProfileTrack:
     track_idx: int
     track_name: Optional[str] = None
     enabled: bool = True
-    blocks: Dict[int, ProfileBlock] = field(default_factory=dict)
+    blocks: dict[int, ProfileBlock] = field(default_factory=dict)
 
     def add_block(self, block_idx: int, name: str, file: str, line: int) -> ProfileBlock:
         """
@@ -127,7 +127,7 @@ class ProfilerResults:
     """
 
     profiler_name: str
-    tracks: Dict[int, ProfileTrack] = field(default_factory=dict)
+    tracks: dict[int, ProfileTrack] = field(default_factory=dict)
 
     @property
     def total_time_ns(self) -> int:
@@ -149,4 +149,3 @@ class ProfilerResults:
             f"tracks={len(self.tracks)}, total_time_ns={self.total_time_ns}, "
             f"total_hits={self.total_hits})"
         )
-
