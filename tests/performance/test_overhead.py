@@ -59,12 +59,21 @@ pytestmark = pytest.mark.skipif(
 
 class TestOverheadMeasurement:
     """Test profiler overhead with statistical rigor."""
-    
+
     @pytest.fixture
-    def baseline_dir(self, tmp_path):
-        """Provide directory for baseline storage."""
-        baseline_dir = tmp_path / "baselines"
-        baseline_dir.mkdir(exist_ok=True)
+    def baseline_dir(self, request, tmp_path):
+        """
+        Provide directory for baseline storage.
+
+        Uses --baseline-dir option if provided, otherwise uses tmp_path.
+        """
+        baseline_path = request.config.getoption("--baseline-dir")
+        if baseline_path:
+            baseline_dir = Path(baseline_path)
+            baseline_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            baseline_dir = tmp_path / "baselines"
+            baseline_dir.mkdir(exist_ok=True)
         return baseline_dir
     
     def measure_baseline(

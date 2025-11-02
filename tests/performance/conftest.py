@@ -8,6 +8,16 @@ import pytest
 from pathlib import Path
 
 
+def pytest_addoption(parser):
+    """Add custom command-line options for performance tests."""
+    parser.addoption(
+        "--baseline-dir",
+        action="store",
+        default=None,
+        help="Directory to store permanent baseline results (default: use tmp_path)"
+    )
+
+
 @pytest.fixture(scope="session")
 def performance_baseline_dir():
     """
