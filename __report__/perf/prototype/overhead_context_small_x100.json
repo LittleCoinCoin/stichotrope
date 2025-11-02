@@ -1,0 +1,20 @@
+{
+  "scenario": "small",
+  "multiplier": 100,
+  "method": "context_manager",
+  "statistics": {
+    "overhead_ns": -341637.833366798,
+    "overhead_pct": -0.30691265586568317,
+    "slowdown_factor": 0.9969308734413431,
+    "baseline_mean_ms": 111.31435176668371,
+    "profiled_mean_ms": 110.97271393331691,
+    "baseline_ci": [
+      111.14269887876947,
+      111.48600465459795
+    ],
+    "profiled_ci": [
+      110.91027292341562,
+      111.0351549432182
+    ]
+  }
+}
