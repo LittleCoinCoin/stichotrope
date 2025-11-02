@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+      - 'milestone/**'
+      - 'task/**'
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'milestone/**'
+
+jobs:
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black>=23.0.0 ruff>=0.1.0 mypy>=1.0.0
+      
+      - name: Check formatting with Black
+        run: python -m black --check stichotrope/ tests/
+      
+      - name: Lint with Ruff
+        run: python -m ruff check stichotrope/ tests/
+      
+      - name: Type check with mypy
+        run: python -m mypy stichotrope/
+
+  test:
+    name: Test (Python ${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest>=7.0.0 pytest-cov>=4.0.0
+      
+      - name: Run unit tests
+        run: python -m pytest tests/unit/ -v --cov=stichotrope --cov-report=term-missing --cov-report=xml
+      
+      - name: Run integration tests
+        run: python -m pytest tests/integration/ -v
+      
+      - name: Upload coverage to artifacts
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 30
+
+  performance-tests:
+    name: Performance Tests (Python ${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest>=7.0.0
+      
+      - name: Run performance tests (smoke only)
+        run: python -m pytest tests/performance/test_overhead.py::TestOverhead::test_overhead_decorator_tiny_x1 -v
+        continue-on-error: true
+      
+      - name: Performance test summary
+        if: always()
+        run: echo "Performance tests completed for Python ${{ matrix.python-version }} on ${{ matrix.os }}"
