@@ -4,7 +4,6 @@ Pytest configuration and shared fixtures for Stichotrope tests.
 This module provides common fixtures and configuration for all test modules.
 """
 
-
 import pytest
 
 

@@ -151,6 +151,7 @@ class TestOverheadMeasurement:
         # Create workload with multiplier
         def base_workload():
             return simulate_work(duration_ms)
+
         variants = create_workload_variants(base_workload, [multiplier])
         workload = variants[f"x{multiplier}"]
 
@@ -221,6 +222,7 @@ class TestOverheadMeasurement:
         # Create workload with multiplier
         def base_workload():
             return simulate_work(duration_ms)
+
         variants = create_workload_variants(base_workload, [multiplier])
         workload = variants[f"x{multiplier}"]
 
