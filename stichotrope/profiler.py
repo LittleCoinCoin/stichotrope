@@ -7,8 +7,9 @@ and call-site caching.
 
 import functools
 import inspect
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Callable, Generator, Optional
+from typing import Any, Callable, Optional
 
 from stichotrope.timing import get_time_ns
 from stichotrope.types import ProfilerResults, ProfileTrack

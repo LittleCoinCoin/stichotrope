@@ -45,7 +45,7 @@ except (ImportError, AttributeError):
         # Note: In real scenario, we'd need to properly import from prototype
         # For now, mark as unavailable and skip tests
         PROFILER_AVAILABLE = False
-    except:
+    except Exception:
         PROFILER_AVAILABLE = False
 
 
