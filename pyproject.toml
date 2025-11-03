@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stichotrope"
-version = "1.0.0-dev.1"
+version = "0.0.0"
 description = "Python profiling library with block-level profiling and multi-track organization"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -75,6 +75,8 @@ branch = "dev"  # Development happens on dev branch
 upload_to_vcs_release = true
 upload_to_pypi = false  # PyPI publishing handled by separate workflow
 build_command = "pip install build && python -m build"
+allow_zero_version = true  # Allow 0.x.x versions (required for pre-1.0.0 development)
+major_on_zero = false  # Breaking changes on 0.x.x bump minor, not major
 
 # Commit parsing configuration (conventional commits)
 [tool.semantic_release.commit_parser_options]
