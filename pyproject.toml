@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stichotrope"
-version = "0.0.0"
+version = "1.0.0-dev.1"
 description = "Python profiling library with block-level profiling and multi-track organization"
 readme = "README.md"
 requires-python = ">=3.9"
