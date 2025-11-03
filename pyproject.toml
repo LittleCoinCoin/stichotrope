@@ -34,8 +34,11 @@ classifiers = [
     "Topic :: System :: Benchmark",
 ]
 
-# Core library has no runtime dependencies
-dependencies = []
+# Core dependencies for TOML configuration support (Milestone 2.2)
+dependencies = [
+    "tomli>=2.0.0; python_version < '3.11'",  # TOML reading (backport for Python <3.11)
+    "tomli-w>=1.0.0",                          # TOML writing (no stdlib equivalent)
+]
 
 [project.optional-dependencies]
 dev = [
@@ -45,6 +48,12 @@ dev = [
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
+]
+
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-material>=9.5.0",
 ]
 
 [project.urls]
@@ -62,9 +71,9 @@ stichotrope = ["py.typed"]
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 version_variables = []
-branch = "main"
+branch = "dev"  # Development happens on dev branch
 upload_to_vcs_release = true
-upload_to_pypi = false
+upload_to_pypi = false  # PyPI publishing handled by separate workflow
 build_command = "pip install build && python -m build"
 
 # Commit parsing configuration (conventional commits)
@@ -81,15 +90,14 @@ exclude_commit_patterns = []
 [tool.semantic_release.changelog.default_templates]
 changelog_file = "CHANGELOG.md"
 
-# Prototype phase: Stay in 0.x versions
+# Version strategy: Real versions on dev, production release on main
 [tool.semantic_release.branches.main]
 match = "(main|master)"
 prerelease = false
 
 [tool.semantic_release.branches.dev]
 match = "dev"
-prerelease = true
-prerelease_token = "dev"
+prerelease = false  # Real versions on dev (0.1.0, 0.1.1, etc.)
 
 # Testing configuration
 [tool.pytest.ini_options]
