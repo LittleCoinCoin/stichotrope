@@ -90,14 +90,15 @@ exclude_commit_patterns = []
 [tool.semantic_release.changelog.default_templates]
 changelog_file = "CHANGELOG.md"
 
-# Version strategy: Real versions on dev, production release on main
+# Version strategy: Dev versions on dev (X.Y.Z.devN), production releases on main
 [tool.semantic_release.branches.main]
 match = "(main|master)"
 prerelease = false
 
 [tool.semantic_release.branches.dev]
 match = "dev"
-prerelease = false  # Real versions on dev (0.1.0, 0.1.1, etc.)
+prerelease = true
+prerelease_token = "dev"  # Creates versions like 0.1.0.dev1, 0.1.1.dev1, etc.
 
 # Testing configuration
 [tool.pytest.ini_options]
