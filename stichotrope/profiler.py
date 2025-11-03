@@ -7,20 +7,21 @@ and call-site caching.
 
 import functools
 import inspect
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Optional, Tuple
-from stichotrope.types import ProfileBlock, ProfileTrack, ProfilerResults
-from stichotrope.timing import get_time_ns
+from typing import Any, Callable, Optional
 
+from stichotrope.timing import get_time_ns
+from stichotrope.types import ProfilerResults, ProfileTrack
 
 # Global enable/disable flag (module-level)
 _PROFILER_ENABLED = True
 
 # Global call-site cache: (track_idx, file, line, name) -> (profiler_id, block_idx)
-_CALL_SITE_CACHE: Dict[Tuple[int, str, int, str], Tuple[int, int]] = {}
+_CALL_SITE_CACHE: dict[tuple[int, str, int, str], tuple[int, int]] = {}
 
 # Global profiler registry: profiler_id -> Profiler instance
-_PROFILER_REGISTRY: Dict[int, "Profiler"] = {}
+_PROFILER_REGISTRY: dict[int, "Profiler"] = {}
 _NEXT_PROFILER_ID = 0
 
 
@@ -74,9 +75,9 @@ class Profiler:
         _PROFILER_REGISTRY[self._profiler_id] = self
 
         self._name = name
-        self._tracks: Dict[int, ProfileTrack] = {}
-        self._track_enabled: Dict[int, bool] = {}  # Per-track enable/disable
-        self._next_block_idx: Dict[int, int] = {}  # Next block index per track
+        self._tracks: dict[int, ProfileTrack] = {}
+        self._track_enabled: dict[int, bool] = {}  # Per-track enable/disable
+        self._next_block_idx: dict[int, int] = {}  # Next block index per track
         self._started = True  # Profiler starts enabled by default
 
     def start(self) -> None:
@@ -131,9 +132,7 @@ class Profiler:
             self._next_block_idx[track_idx] = 0
         return self._tracks[track_idx]
 
-    def _register_block(
-        self, track_idx: int, name: str, file: str, line: int
-    ) -> int:
+    def _register_block(self, track_idx: int, name: str, file: str, line: int) -> int:
         """
         Register a new profiling block and return its index.
 
@@ -260,7 +259,7 @@ class Profiler:
         return decorator
 
     @contextmanager
-    def block(self, track_idx: int, name: str):
+    def block(self, track_idx: int, name: str) -> Generator[None, None, None]:
         """
         Context manager for profiling code blocks.
 
@@ -325,8 +324,9 @@ class Profiler:
             filename: Output CSV filename
         """
         from stichotrope.export import export_csv
+
         results = self.get_results()
-        with open(filename, 'w', newline='') as f:
+        with open(filename, "w", newline="") as f:
             export_csv(results, f)
 
     def export_json(self, filename: str, indent: int = 2) -> None:
@@ -338,13 +338,15 @@ class Profiler:
             indent: JSON indentation level
         """
         from stichotrope.export import export_json
+
         results = self.get_results()
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             export_json(results, f, indent=indent)
 
     def print_results(self) -> None:
         """Print profiling results to console in a formatted table."""
         from stichotrope.export import print_results
+
         results = self.get_results()
         print_results(results)
 
@@ -358,4 +360,3 @@ class Profiler:
 def _get_profiler(profiler_id: int) -> Optional[Profiler]:
     """Get a profiler instance by ID from the global registry."""
     return _PROFILER_REGISTRY.get(profiler_id)
-

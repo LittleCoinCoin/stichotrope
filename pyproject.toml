@@ -145,6 +145,8 @@ ignore = [
 
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
+"tests/conftest.py" = ["F401"]  # Allow unused imports for availability checks
+"tests/performance/benchmarks/competitors.py" = ["F401"]  # Allow unused imports for availability checks
 
 # Type checking with mypy
 [tool.mypy]

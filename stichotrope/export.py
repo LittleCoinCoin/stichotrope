@@ -7,7 +7,8 @@ Provides CSV, JSON, and console output formats.
 import csv
 import json
 from io import StringIO
-from typing import TextIO, Optional
+from typing import Any, Optional, TextIO
+
 from stichotrope.types import ProfilerResults
 
 
@@ -29,17 +30,19 @@ def export_csv(results: ProfilerResults, file: Optional[TextIO] = None) -> str:
     writer = csv.writer(output)
 
     # Write header
-    writer.writerow([
-        "Track",
-        "Block Name",
-        "Hit Count",
-        "Total Time (ns)",
-        "Avg Time (ns)",
-        "Min Time (ns)",
-        "Max Time (ns)",
-        "% Track",
-        "% Total"
-    ])
+    writer.writerow(
+        [
+            "Track",
+            "Block Name",
+            "Hit Count",
+            "Total Time (ns)",
+            "Avg Time (ns)",
+            "Min Time (ns)",
+            "Max Time (ns)",
+            "% Track",
+            "% Total",
+        ]
+    )
 
     # Calculate total time across all tracks
     total_time_all = results.total_time_ns
@@ -53,23 +56,27 @@ def export_csv(results: ProfilerResults, file: Optional[TextIO] = None) -> str:
             block = track.blocks[block_idx]
 
             # Calculate percentages
-            pct_track = (block.total_time_ns / track_total_time * 100) if track_total_time > 0 else 0.0
+            pct_track = (
+                (block.total_time_ns / track_total_time * 100) if track_total_time > 0 else 0.0
+            )
             pct_total = (block.total_time_ns / total_time_all * 100) if total_time_all > 0 else 0.0
 
             # Handle min_time_ns initialization value
             min_time = block.min_time_ns if block.hit_count > 0 else 0
 
-            writer.writerow([
-                track_idx,
-                block.name,
-                block.hit_count,
-                block.total_time_ns,
-                f"{block.avg_time_ns:.0f}",
-                min_time,
-                block.max_time_ns,
-                f"{pct_track:.2f}",
-                f"{pct_total:.2f}"
-            ])
+            writer.writerow(
+                [
+                    track_idx,
+                    block.name,
+                    block.hit_count,
+                    block.total_time_ns,
+                    f"{block.avg_time_ns:.0f}",
+                    min_time,
+                    block.max_time_ns,
+                    f"{pct_track:.2f}",
+                    f"{pct_total:.2f}",
+                ]
+            )
 
     csv_str = output.getvalue()
 
@@ -115,18 +122,15 @@ def export_json(results: ProfilerResults, file: Optional[TextIO] = None, indent:
     Returns:
         JSON string if file is None, otherwise empty string
     """
-    data = {
-        "profiler_name": results.profiler_name,
-        "tracks": []
-    }
+    data: dict[str, Any] = {"profiler_name": results.profiler_name, "tracks": []}
 
     for track_idx in sorted(results.tracks.keys()):
         track = results.tracks[track_idx]
-        track_data = {
+        track_data: dict[str, Any] = {
             "track_idx": track.track_idx,
             "track_name": track.track_name,
             "enabled": track.enabled,
-            "blocks": []
+            "blocks": [],
         }
 
         for block_idx in sorted(track.blocks.keys()):
@@ -143,7 +147,7 @@ def export_json(results: ProfilerResults, file: Optional[TextIO] = None, indent:
                 "total_time_ns": block.total_time_ns,
                 "avg_time_ns": block.avg_time_ns,
                 "min_time_ns": min_time,
-                "max_time_ns": block.max_time_ns
+                "max_time_ns": block.max_time_ns,
             }
             track_data["blocks"].append(block_data)
 
@@ -201,7 +205,9 @@ def print_results(results: ProfilerResults) -> None:
         print("-" * 120)
 
         # Print header
-        print(f"{'Block Name':<40} {'Hits':>10} {'Total':>15} {'Avg':>15} {'Min':>15} {'Max':>15} {'%Track':>8}")
+        print(
+            f"{'Block Name':<40} {'Hits':>10} {'Total':>15} {'Avg':>15} {'Min':>15} {'Max':>15} {'%Track':>8}"
+        )
         print("-" * 120)
 
         # Print blocks
@@ -209,7 +215,11 @@ def print_results(results: ProfilerResults) -> None:
             block = track.blocks[block_idx]
 
             # Calculate percentage of track
-            pct_track = (block.total_time_ns / track.total_time_ns * 100) if track.total_time_ns > 0 else 0.0
+            pct_track = (
+                (block.total_time_ns / track.total_time_ns * 100)
+                if track.total_time_ns > 0
+                else 0.0
+            )
 
             # Handle min_time_ns initialization value
             min_time = block.min_time_ns if block.hit_count > 0 else 0
@@ -225,4 +235,3 @@ def print_results(results: ProfilerResults) -> None:
             )
 
     print("=" * 120)
-
