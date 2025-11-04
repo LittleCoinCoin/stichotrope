@@ -1,0 +1,51 @@
+site_name: Stichotrope
+site_description: Python profiling library with block-level profiling and multi-track organization
+site_url: https://littlecoincoin.github.io/stichotrope/
+repo_url: https://github.com/LittleCoinCoin/stichotrope
+repo_name: LittleCoinCoin/stichotrope
+docs_dir: docs
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_object_full_path: false
+            show_category_heading: true
+            show_labels: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+  - print-site
+
+markdown_extensions:
+  - admonition
+  - tables
+  - fenced_code
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Users:
+      - Getting Started: articles/users/GettingStarted.md
+  - Developers:
+      - Overview: articles/devs/index.md
+  - API Reference:
+      - Overview: articles/api/index.md
+      - Profiler: articles/api/profiler.md
+      - Export: articles/api/export.md
+      - Types: articles/api/types.md
+  - Appendices:
+      - Overview: articles/appendices/index.md
+      - Glossary: articles/appendices/glossary.md
+
