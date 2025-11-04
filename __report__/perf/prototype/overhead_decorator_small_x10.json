@@ -1,0 +1,20 @@
+{
+  "scenario": "small",
+  "multiplier": 10,
+  "method": "decorator",
+  "statistics": {
+    "overhead_ns": 76401.03334173067,
+    "overhead_pct": 0.6840047979397349,
+    "slowdown_factor": 1.0068400479793973,
+    "baseline_mean_ms": 11.169663366668676,
+    "profiled_mean_ms": 11.246064400010408,
+    "baseline_ci": [
+      11.131670379411316,
+      11.207656353926035
+    ],
+    "profiled_ci": [
+      11.19980873830732,
+      11.292320061713493
+    ]
+  }
+}

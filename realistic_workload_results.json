@@ -1,0 +1,133 @@
+{
+  "profiler_name": "WebApp",
+  "tracks": [
+    {
+      "track_idx": 0,
+      "track_name": "Request Handling",
+      "enabled": true,
+      "blocks": [
+        {
+          "name": "handle_product_listing_request",
+          "file": "C:\\Users\\eliot\\miniforge3\\Lib\\contextlib.py",
+          "line": 137,
+          "hit_count": 10,
+          "total_time_ns": 569040900,
+          "avg_time_ns": 56904090.0,
+          "min_time_ns": 51894600,
+          "max_time_ns": 63596100
+        }
+      ]
+    },
+    {
+      "track_idx": 1,
+      "track_name": "Database Operations",
+      "enabled": true,
+      "blocks": [
+        {
+          "name": "fetch_user",
+          "file": "C:\\Users\\eliot\\miniforge3\\Lib\\contextlib.py",
+          "line": 137,
+          "hit_count": 10,
+          "total_time_ns": 36530400,
+          "avg_time_ns": 3653040.0,
+          "min_time_ns": 2862400,
+          "max_time_ns": 5096500
+        },
+        {
+          "name": "fetch_products",
+          "file": "C:\\Users\\eliot\\miniforge3\\Lib\\contextlib.py",
+          "line": 137,
+          "hit_count": 10,
+          "total_time_ns": 72795000,
+          "avg_time_ns": 7279500.0,
+          "min_time_ns": 5952500,
+          "max_time_ns": 9989900
+        },
+        {
+          "name": "update_user_activity",
+          "file": "C:\\Users\\eliot\\miniforge3\\Lib\\contextlib.py",
+          "line": 137,
+          "hit_count": 10,
+          "total_time_ns": 22766200,
+          "avg_time_ns": 2276620.0,
+          "min_time_ns": 1432400,
+          "max_time_ns": 3490400
+        }
+      ]
+    },
+    {
+      "track_idx": 2,
+      "track_name": "Business Logic",
+      "enabled": true,
+      "blocks": [
+        {
+          "name": "calculate_recommendations",
+          "file": "C:\\Users\\eliot\\miniforge3\\Lib\\contextlib.py",
+          "line": 137,
+          "hit_count": 10,
+          "total_time_ns": 149810700,
+          "avg_time_ns": 14981070.0,
+          "min_time_ns": 10524400,
+          "max_time_ns": 19988700
+        },
+        {
+          "name": "apply_pricing_rules",
+          "file": "C:\\Users\\eliot\\miniforge3\\Lib\\contextlib.py",
+          "line": 137,
+          "hit_count": 10,
+          "total_time_ns": 74941500,
+          "avg_time_ns": 7494150.0,
+          "min_time_ns": 5465400,
+          "max_time_ns": 9433800
+        },
+        {
+          "name": "validate_inventory",
+          "file": "C:\\Users\\eliot\\miniforge3\\Lib\\contextlib.py",
+          "line": 137,
+          "hit_count": 10,
+          "total_time_ns": 51266400,
+          "avg_time_ns": 5126640.0,
+          "min_time_ns": 3512900,
+          "max_time_ns": 7508900
+        }
+      ]
+    },
+    {
+      "track_idx": 3,
+      "track_name": "I/O Operations",
+      "enabled": true,
+      "blocks": [
+        {
+          "name": "load_user_preferences",
+          "file": "C:\\Users\\eliot\\miniforge3\\Lib\\contextlib.py",
+          "line": 137,
+          "hit_count": 10,
+          "total_time_ns": 22194200,
+          "avg_time_ns": 2219420.0,
+          "min_time_ns": 1330100,
+          "max_time_ns": 3457300
+        },
+        {
+          "name": "cache_results",
+          "file": "C:\\Users\\eliot\\miniforge3\\Lib\\contextlib.py",
+          "line": 137,
+          "hit_count": 10,
+          "total_time_ns": 30563500,
+          "avg_time_ns": 3056350.0,
+          "min_time_ns": 2525600,
+          "max_time_ns": 3981800
+        },
+        {
+          "name": "send_analytics",
+          "file": "C:\\Users\\eliot\\miniforge3\\Lib\\contextlib.py",
+          "line": 137,
+          "hit_count": 10,
+          "total_time_ns": 104259800,
+          "avg_time_ns": 10425980.0,
+          "min_time_ns": 5490200,
+          "max_time_ns": 13944800
+        }
+      ]
+    }
+  ]
+}

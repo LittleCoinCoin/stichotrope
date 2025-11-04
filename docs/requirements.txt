@@ -1,0 +1,5 @@
+mkdocstrings
+mkdocstrings-python
+mkdocs-material
+mkdocs-print-site-plugin
+
