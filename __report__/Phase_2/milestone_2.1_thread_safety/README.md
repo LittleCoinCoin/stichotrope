@@ -39,9 +39,27 @@ This directory contains architecture analysis and design reports for Milestone 2
     - Streamlined testing section (details in Task 2.1.2)
     - Reduced length (~40% shorter, clearer for stakeholder review)
 
+### Phase 2: Test Definition (Task 2.1.2)
+
+- **[02-test_definition_v0.md](./02-test_definition_v0.md)** 📦 **ARCHIVED** - Initial test suite definition
+  - Issue: [#19 - Design Thread-Safe Test Suite](https://github.com/LittleCoinCoin/stichotrope/issues/19)
+  - Status: Superseded by v1
+
+- **[02-test_definition_v1.md](./02-test_definition_v1.md)** ⭐ **CURRENT** - Refined test suite definition
+  - Issue: [#19 - Design Thread-Safe Test Suite](https://github.com/LittleCoinCoin/stichotrope/issues/19)
+  - Pre-conditions: Task 2.1.1 approved ✅
+  - Improvements from v0:
+    - Replaced Wobble with pytest (standard for Stichotrope)
+    - Added dependency recommendations (pytest-timeout, psutil)
+    - Fixed test development workflow section
+    - Updated all execution examples to pytest commands
+  - Test categories: Unit (11), Integration (6), Stress (4), Performance (3)
+  - Total: 24 tests covering thread-safety validation
+  - Test infrastructure: Fixtures, test data, validation helpers
+  - Success gates: All requirements satisfied (awaiting review)
+
 ### Future Phases
 
-- **Phase 2**: Test Definition (Task 2.1.2)
 - **Phase 3**: Implementation (Tasks 2.1.3, 2.1.4)
 
 ## Critical Findings
@@ -97,16 +115,21 @@ Based on approved evaluation (Task 2.1.0):
 ## Status
 
 - ✅ Task 2.1.0: Evaluation report v0 - APPROVED by stakeholder
-- ✅ Task 2.1.1: Design report v1 complete - awaiting stakeholder review
+- ✅ Task 2.1.1: Design report v1 - APPROVED by stakeholder
   - v0: Initial version (superseded)
   - v1: Refined with Mermaid diagrams, pseudo-code focus, binary merge analysis
-- ⏳ Task 2.1.2: Not started (blocked by 2.1.1 approval)
-- ⏳ Task 2.1.3: Not started (Phase 3 - Implementation)
-- ⏳ Task 2.1.4: Not started (Phase 3 - Implementation)
+- ✅ Task 2.1.2: Test definition v1 complete - awaiting stakeholder review
+  - v0: Initial version (superseded)
+  - v1: Refined with pytest integration, dependency recommendations, workflow clarity
+  - 24 tests defined (11 unit, 6 integration, 4 stress, 3 performance)
+  - Test infrastructure specified (fixtures, test data, validation helpers)
+  - All success gates satisfied
+- ⏳ Task 2.1.3: Not started (blocked by 2.1.2 approval)
+- ⏳ Task 2.1.4: Not started (blocked by 2.1.3 completion)
 
 ---
 
-**Last Updated**: 2025-11-04
-**Report Version**: Evaluation v0 (approved), Design v1 (awaiting review)
-**Next Steps**: Stakeholder review of architecture design document v1
+**Last Updated**: 2025-11-07
+**Report Version**: Evaluation v0 (approved), Design v1 (approved), Test Definition v1 (awaiting review)
+**Next Steps**: Stakeholder review of test definition document v1
 
