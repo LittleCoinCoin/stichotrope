@@ -45,6 +45,8 @@ dev = [
     "python-semantic-release>=8.0.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "pytest-timeout>=2.1.0",  # Deadlock detection for thread-safety tests
+    "psutil>=5.9.0",          # Memory usage measurement for performance tests
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
@@ -117,6 +119,14 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "performance: Performance tests",
+    "thread_safety: Thread-safety specific tests",
+    "stress: Stress tests (high load)",
+    "slow: Slow-running tests",
+]
 
 # Code formatting with Black
 [tool.black]
