@@ -112,17 +112,15 @@ class Profiler:
 
         Uses hasattr pattern to avoid AttributeError on first access.
         Registers thread in global registry on first access.
+        Caches thread_data reference in thread-local storage for fast access.
 
         Returns:
             Thread-local data object with tracks, track_enabled, next_block_idx
         """
-        if not hasattr(self._thread_local, 'thread_id'):
+        if not hasattr(self._thread_local, 'data'):
             # First access from this thread - initialize thread-local storage
             thread_id = threading.get_ident()
             thread_name = threading.current_thread().name
-
-            # Store thread_id in thread-local storage for fast lookup
-            self._thread_local.thread_id = thread_id
 
             # Register thread in global registry (LOCK REQUIRED)
             # Create a data object to hold this thread's profiling data
@@ -141,8 +139,16 @@ class Profiler:
 
                     self._all_thread_data[thread_id] = thread_data
 
-        # Return the thread's data from the global registry
-        return self._all_thread_data[self._thread_local.thread_id]
+                else:
+                    # Thread was already registered (e.g., after clear())
+                    thread_data = self._all_thread_data[thread_id]
+
+            # Cache thread_data reference in thread-local storage for fast access
+            # This eliminates dict lookup on every _get_thread_data() call
+            self._thread_local.data = thread_data
+
+        # Return cached thread_data reference (fast - no dict lookup)
+        return self._thread_local.data
 
     def set_track_enabled(self, track_idx: int, enabled: bool) -> None:
         """
@@ -317,11 +323,10 @@ class Profiler:
         with self._global_lock:
             self._all_thread_data.clear()
 
-        # Clear current thread's thread-local data
-        if hasattr(self._thread_local, 'tracks'):
-            self._thread_local.tracks.clear()
-            self._thread_local.track_enabled.clear()
-            self._thread_local.next_block_idx.clear()
+        # Invalidate cached thread_data reference in current thread
+        # This ensures the thread re-initializes on next access
+        if hasattr(self._thread_local, 'data'):
+            delattr(self._thread_local, 'data')
 
     def track(self, track_idx: int, name: Optional[str] = None) -> Callable:
         """
