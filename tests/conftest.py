@@ -97,13 +97,20 @@ def profiler():
         Profiler: Fresh profiler instance
 
     Note:
-        Automatically clears profiler data after test completion.
+        Automatically clears profiler data and global cache after test completion.
     """
     try:
         from stichotrope import Profiler
+        from stichotrope import profiler as profiler_module
     except (ImportError, AttributeError):
         pytest.skip("Profiler implementation not available")
 
+    # Clear global call-site cache BEFORE test to ensure fresh block indices
+    try:
+        profiler_module._CALL_SITE_CACHE.clear()
+    except AttributeError:
+        pass  # Cache may not exist yet
+    
     p = Profiler("TestProfiler")
     yield p
     # Cleanup: clear profiler data
@@ -111,6 +118,12 @@ def profiler():
         p.clear()
     except AttributeError:
         pass  # clear() method may not exist yet
+    
+    # Clear global call-site cache to ensure fresh block indices for each test
+    try:
+        profiler_module._CALL_SITE_CACHE.clear()
+    except AttributeError:
+        pass  # Cache may not exist yet
 
 
 @pytest.fixture
