@@ -200,7 +200,8 @@ def create_bar_chart(comparisons: List[Dict], datasets: List[Dataset], output_pa
         all_bars = []
         for ds_idx, ds in enumerate(datasets):
             values = []
-            errors = []
+            errors_lower = []
+            errors_upper = []
             pcts = []
 
             for scenario in scenarios:
@@ -210,21 +211,35 @@ def create_bar_chart(comparisons: List[Dict], datasets: List[Dataset], output_pa
                     c = matching[0]
                     stats = c['datasets'][ds.name]
                     # Use absolute overhead in microseconds
-                    values.append(abs(stats['overhead_us']))  # abs for log scale
-                    errors.append(stats['overhead_us_std'])
+                    mean_val = abs(stats['overhead_us'])  # abs for log scale
+                    std_val = stats['overhead_us_std']
+
+                    values.append(mean_val)
+
+                    # For log scale, calculate asymmetric error bars
+                    # Lower error: distance from mean to (mean - σ), but can't go below 0.01
+                    lower_bound = max(0.01, mean_val - std_val)
+                    errors_lower.append(mean_val - lower_bound)
+
+                    # Upper error: distance from mean to (mean + σ)
+                    errors_upper.append(std_val)
+
                     pcts.append(stats['overhead_pct'])
                 else:
                     values.append(0.01)  # Small value for log scale
-                    errors.append(0)
+                    errors_lower.append(0)
+                    errors_upper.append(0)
                     pcts.append(0)
 
             # Calculate bar positions (centered around x)
             offset = (ds_idx - (n_datasets - 1) / 2) * width
             positions = x + offset
 
-            # Create bars with error bars (±1 SD)
+            # Create bars with asymmetric error bars for log scale (±1 SD)
+            # yerr format: [[lower_errors], [upper_errors]]
+            yerr = np.array([errors_lower, errors_upper])
             bars = ax.bar(positions, values, width,
-                         yerr=errors, capsize=5,
+                         yerr=yerr, capsize=5,
                          label=ds.name, color=colors[ds_idx],
                          error_kw={'elinewidth': 1, 'capthick': 1})
             all_bars.append((bars, values, pcts))
