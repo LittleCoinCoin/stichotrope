@@ -9,6 +9,13 @@ import math
 import statistics
 from typing import Any, Optional
 
+try:
+    from scipy import stats as scipy_stats
+
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+
 
 def calculate_confidence_interval(
     data: list[float], confidence: float = 0.95
@@ -238,3 +245,65 @@ def check_regression(
         )
     else:
         return (False, f"OK: Overhead change {delta:+.2f}% (threshold: {threshold_pct}%)")
+
+
+def perform_welch_ttest(
+    group1: list[float], group2: list[float]
+) -> dict[str, Any]:
+    """
+    Perform Welch's t-test to compare two groups.
+
+    Welch's t-test does not assume equal variances and is more robust
+    for real-world performance data than Student's t-test.
+
+    Args:
+        group1: First group of measurements
+        group2: Second group of measurements
+
+    Returns:
+        Dictionary containing:
+        - t_statistic: The t-statistic
+        - p_value: Two-sided p-value
+        - significant: True if p < 0.05 (statistically significant difference)
+        - interpretation: Human-readable interpretation
+
+    Raises:
+        ImportError: If scipy is not installed
+    """
+    if not SCIPY_AVAILABLE:
+        raise ImportError(
+            "scipy is required for statistical testing. "
+            "Install with: pip install scipy>=1.11.0"
+        )
+
+    if len(group1) < 2 or len(group2) < 2:
+        return {
+            "t_statistic": 0.0,
+            "p_value": 1.0,
+            "significant": False,
+            "interpretation": "Insufficient data for statistical testing (need ≥2 samples per group)",
+        }
+
+    # Perform Welch's t-test (equal_var=False)
+    t_statistic, p_value = scipy_stats.ttest_ind(group1, group2, equal_var=False)
+
+    # Interpret results
+    significant = p_value < 0.05
+
+    if significant:
+        interpretation = (
+            f"Statistically significant difference detected (p={p_value:.4f} < 0.05). "
+            f"The two groups have different means."
+        )
+    else:
+        interpretation = (
+            f"No statistically significant difference (p={p_value:.4f} ≥ 0.05). "
+            f"Cannot conclude the groups have different means."
+        )
+
+    return {
+        "t_statistic": float(t_statistic),
+        "p_value": float(p_value),
+        "significant": significant,
+        "interpretation": interpretation,
+    }

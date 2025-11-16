@@ -5,13 +5,20 @@ Compares Stichotrope overhead with cProfile for function-level profiling.
 Tests SECONDARY success criterion: Competitive with cProfile.
 """
 
+import json
+import sys
 import time
 import timeit
 import statistics
 import cProfile
 import pstats
 from io import StringIO
+from pathlib import Path
 from stichotrope import Profiler
+
+# Add tests/performance to path for statistics_utils
+sys.path.insert(0, str(Path(__file__).parent.parent / "tests" / "performance"))
+from statistics_utils import perform_welch_ttest
 
 
 def simulate_work(duration_ms: float):
@@ -136,8 +143,8 @@ def print_comparison(duration_ms, unprofiled_stats, stichotrope_stats, cprofile_
         print(f"  = Stichotrope and cProfile have similar overhead")
 
 
-def run_comparison():
-    """Run complete cProfile comparison."""
+def run_comparison(output_file: Path = None):
+    """Run complete cProfile comparison with statistical testing."""
     print("="*80)
     print("STICHOTROPE vs cProfile COMPARISON")
     print("="*80)
@@ -166,27 +173,45 @@ def run_comparison():
         cprofile_times = benchmark_cprofile(duration_ms, iterations)
         cprofile_stats = calculate_stats(cprofile_times)
 
+        # Statistical testing
+        stich_vs_baseline = perform_welch_ttest(stichotrope_times, unprofiled_times)
+        cprof_vs_baseline = perform_welch_ttest(cprofile_times, unprofiled_times)
+        stich_vs_cprof = perform_welch_ttest(stichotrope_times, cprofile_times)
+
         # Print comparison
         print_comparison(duration_ms, unprofiled_stats, stichotrope_stats, cprofile_stats)
 
         results.append({
             "duration_ms": duration_ms,
-            "unprofiled": unprofiled_stats,
-            "stichotrope": stichotrope_stats,
-            "cprofile": cprofile_stats,
+            "raw_data": {
+                "unprofiled_times_ms": [t * 1000 for t in unprofiled_times],
+                "stichotrope_times_ms": [t * 1000 for t in stichotrope_times],
+                "cprofile_times_ms": [t * 1000 for t in cprofile_times],
+            },
+            "statistics": {
+                "unprofiled": unprofiled_stats,
+                "stichotrope": stichotrope_stats,
+                "cprofile": cprofile_stats,
+            },
+            "statistical_tests": {
+                "stichotrope_vs_baseline": stich_vs_baseline,
+                "cprofile_vs_baseline": cprof_vs_baseline,
+                "stichotrope_vs_cprofile": stich_vs_cprof,
+            }
         })
 
     # Summary
     print(f"\n{'='*80}")
     print("SUMMARY")
     print(f"{'='*80}")
-    print(f"\n{'Duration':<12} {'Stichotrope':<20} {'cProfile':<20} {'Winner':<15}")
+    print(f"\n{'Duration':<12} {'Stichotrope':<20} {'cProfile':<20} {'Winner':<15} {'p-value':<12}")
     print("-"*80)
 
     for result in results:
         duration = result["duration_ms"]
-        stich_overhead = (result["stichotrope"]["mean"] - result["unprofiled"]["mean"]) / result["unprofiled"]["mean"] * 100
-        cprof_overhead = (result["cprofile"]["mean"] - result["unprofiled"]["mean"]) / result["unprofiled"]["mean"] * 100
+        stich_overhead = (result["statistics"]["stichotrope"]["mean"] - result["statistics"]["unprofiled"]["mean"]) / result["statistics"]["unprofiled"]["mean"] * 100
+        cprof_overhead = (result["statistics"]["cprofile"]["mean"] - result["statistics"]["unprofiled"]["mean"]) / result["statistics"]["unprofiled"]["mean"] * 100
+        p_value = result["statistical_tests"]["stichotrope_vs_cprofile"]["p_value"]
 
         if stich_overhead < cprof_overhead:
             winner = "Stichotrope"
@@ -195,13 +220,13 @@ def run_comparison():
         else:
             winner = "Tie"
 
-        print(f"{duration:<12.1f} {stich_overhead:>10.2f}%        {cprof_overhead:>10.2f}%        {winner:<15}")
+        print(f"{duration:<12.1f} {stich_overhead:>10.2f}%        {cprof_overhead:>10.2f}%        {winner:<15} p={p_value:.4f}")
 
     print(f"\n{'='*80}")
 
     # Overall assessment
-    stich_wins = sum(1 for r in results if (r["stichotrope"]["mean"] - r["unprofiled"]["mean"]) < (r["cprofile"]["mean"] - r["unprofiled"]["mean"]))
-    cprof_wins = sum(1 for r in results if (r["cprofile"]["mean"] - r["unprofiled"]["mean"]) < (r["stichotrope"]["mean"] - r["unprofiled"]["mean"]))
+    stich_wins = sum(1 for r in results if (r["statistics"]["stichotrope"]["mean"] - r["statistics"]["unprofiled"]["mean"]) < (r["statistics"]["cprofile"]["mean"] - r["statistics"]["unprofiled"]["mean"]))
+    cprof_wins = sum(1 for r in results if (r["statistics"]["cprofile"]["mean"] - r["statistics"]["unprofiled"]["mean"]) < (r["statistics"]["stichotrope"]["mean"] - r["statistics"]["unprofiled"]["mean"]))
 
     print("\nOVERALL ASSESSMENT:")
     if stich_wins > cprof_wins:
@@ -213,9 +238,22 @@ def run_comparison():
 
     print(f"{'='*80}\n")
 
+    # Save results to JSON if output file specified
+    if output_file:
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        print(f"✅ Results saved to: {output_file}\n")
+
     return results
 
 
 if __name__ == "__main__":
-    results = run_comparison()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Compare Stichotrope vs cProfile performance")
+    parser.add_argument("--output", type=Path, help="Output JSON file path")
+    args = parser.parse_args()
+
+    results = run_comparison(output_file=args.output)
 

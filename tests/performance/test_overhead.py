@@ -179,12 +179,18 @@ class TestOverheadMeasurement:
                     "scenario": scenario,
                     "multiplier": multiplier,
                     "method": "decorator",
+                    "raw_data": {
+                        "baseline_times_ms": [t * 1000 for t in baseline_times],
+                        "profiled_times_ms": [t * 1000 for t in profiled_times],
+                    },
                     "statistics": {
                         "overhead_ns": stats["overhead_ns"],
                         "overhead_pct": stats["overhead_pct"],
                         "slowdown_factor": stats["slowdown_factor"],
                         "baseline_mean_ms": stats["baseline"]["mean"] * 1000,
+                        "baseline_std_ms": stats["baseline"]["std_dev"] * 1000,
                         "profiled_mean_ms": stats["profiled"]["mean"] * 1000,
+                        "profiled_std_ms": stats["profiled"]["std_dev"] * 1000,
                         "baseline_ci": [
                             stats["baseline"]["ci_lower"] * 1000,
                             stats["baseline"]["ci_upper"] * 1000,
@@ -250,12 +256,18 @@ class TestOverheadMeasurement:
                     "scenario": scenario,
                     "multiplier": multiplier,
                     "method": "context_manager",
+                    "raw_data": {
+                        "baseline_times_ms": [t * 1000 for t in baseline_times],
+                        "profiled_times_ms": [t * 1000 for t in profiled_times],
+                    },
                     "statistics": {
                         "overhead_ns": stats["overhead_ns"],
                         "overhead_pct": stats["overhead_pct"],
                         "slowdown_factor": stats["slowdown_factor"],
                         "baseline_mean_ms": stats["baseline"]["mean"] * 1000,
+                        "baseline_std_ms": stats["baseline"]["std_dev"] * 1000,
                         "profiled_mean_ms": stats["profiled"]["mean"] * 1000,
+                        "profiled_std_ms": stats["profiled"]["std_dev"] * 1000,
                         "baseline_ci": [
                             stats["baseline"]["ci_lower"] * 1000,
                             stats["baseline"]["ci_upper"] * 1000,
