@@ -1,13 +1,15 @@
 """
-Compare performance baselines between prototype and thread-safe implementation.
+Compare performance baselines across multiple versions of Stichotrope.
 
-Generates concise comparison report with bar charts including error bars and statistical tests.
+Supports comparing arbitrary number of dataset directories with flexible configuration.
+Generates comparison reports with bar charts including error bars and statistical tests.
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -32,153 +34,200 @@ def load_all_baselines(baseline_dir: Path) -> Dict[str, Dict]:
     return baselines
 
 
-def compare_baselines(prototype_dir: Path, threadsafe_dir: Path) -> List[Dict]:
-    """Compare prototype and thread-safe baselines with statistical testing."""
-    prototype = load_all_baselines(prototype_dir)
-    threadsafe = load_all_baselines(threadsafe_dir)
+class Dataset:
+    """Represents a single dataset (version) for comparison."""
+
+    def __init__(self, path: Path, name: Optional[str] = None):
+        """
+        Initialize dataset.
+
+        Args:
+            path: Path to directory containing overhead_*.json files
+            name: Optional custom name for this dataset. If None, auto-generated from directory stem.
+        """
+        self.path = path
+        self.name = name or self._auto_generate_name()
+        self.baselines = load_all_baselines(path)
+
+    def _auto_generate_name(self) -> str:
+        """Auto-generate dataset name from directory stem."""
+        stem = self.path.stem
+        # Special case: "prototype" directory should be labeled "Prototype" (no version)
+        if stem.lower() == "prototype":
+            return "Prototype"
+        # Otherwise use the stem as-is (e.g., "v0.2.0" → "v0.2.0")
+        return stem
+
+
+def extract_dataset_stats(data: Dict) -> Dict:
+    """Extract statistics from a single dataset's baseline data."""
+    # Extract raw data if available (new format), otherwise use aggregated stats
+    if 'raw_data' in data:
+        # New format with raw data
+        baseline = np.array(data['raw_data']['baseline_times_ms'])
+        profiled = np.array(data['raw_data']['profiled_times_ms'])
+
+        # Calculate overhead percentages for each measurement
+        overhead_pcts = ((profiled - baseline) / baseline) * 100
+
+        # Calculate standard deviation of overhead percentages
+        std_pct = np.std(overhead_pcts, ddof=1)  # Sample std dev
+
+        # Calculate std dev in microseconds
+        overhead_us_std = np.std(overhead_pcts * data['statistics']['baseline_mean_ms'] * 10, ddof=1)
+    else:
+        # Old format without raw data - use coefficient of variation as approximation
+        std_pct = (data['statistics'].get('baseline_std_ms', 0) /
+                  data['statistics']['baseline_mean_ms'] * 100) if 'baseline_std_ms' in data['statistics'] else 0
+        # Approximate from percentage std dev
+        overhead_us_std = std_pct * data['statistics']['baseline_mean_ms'] * 10
+
+    # Calculate absolute overhead in microseconds
+    overhead_us = data['statistics'].get('overhead_ns', 0) / 1000  # ns to µs
+
+    return {
+        'overhead_pct': data['statistics']['overhead_pct'],
+        'std_pct': std_pct,
+        'overhead_us': overhead_us,
+        'overhead_us_std': overhead_us_std,
+        'raw_data': data.get('raw_data'),
+    }
+
+
+def compare_baselines(datasets: List[Dataset]) -> List[Dict]:
+    """
+    Compare baselines across multiple datasets with statistical testing.
+
+    Args:
+        datasets: List of Dataset objects to compare
+
+    Returns:
+        List of comparison dictionaries, one per scenario/method/multiplier combination
+    """
+    if len(datasets) < 2:
+        raise ValueError("Need at least 2 datasets to compare")
+
+    # Use first dataset as reference to get all keys
+    reference = datasets[0]
 
     comparisons = []
-    for key in sorted(prototype.keys()):
-        if key not in threadsafe:
+    for key in sorted(reference.baselines.keys()):
+        # Check if all datasets have this key
+        if not all(key in ds.baselines for ds in datasets):
             continue
 
-        p = prototype[key]
-        t = threadsafe[key]
+        # Extract metadata from reference dataset
+        ref_data = reference.baselines[key]
 
-        # Extract raw data if available (new format), otherwise use aggregated stats
-        if 'raw_data' in p and 'raw_data' in t:
-            # New format with raw data
-            p_baseline = np.array(p['raw_data']['baseline_times_ms'])
-            p_profiled = np.array(p['raw_data']['profiled_times_ms'])
-            t_baseline = np.array(t['raw_data']['baseline_times_ms'])
-            t_profiled = np.array(t['raw_data']['profiled_times_ms'])
+        # Extract stats for all datasets
+        dataset_stats = {}
+        for ds in datasets:
+            dataset_stats[ds.name] = extract_dataset_stats(ds.baselines[key])
 
-            # Calculate overhead percentages for each measurement
-            p_overhead_pcts = ((p_profiled - p_baseline) / p_baseline) * 100
-            t_overhead_pcts = ((t_profiled - t_baseline) / t_baseline) * 100
-
-            # Calculate standard deviations of overhead percentages
-            p_std_pct = np.std(p_overhead_pcts, ddof=1)  # Sample std dev
-            t_std_pct = np.std(t_overhead_pcts, ddof=1)
-
-            # Perform Welch's t-test on profiled times (converted to seconds)
-            try:
-                ttest_result = perform_welch_ttest(
-                    p_profiled / 1000,  # Convert to seconds
-                    t_profiled / 1000
-                )
-            except ImportError:
-                ttest_result = {
-                    'p_value': None,
-                    'significant': False,
-                    'interpretation': 'scipy not available'
-                }
-        else:
-            # Old format without raw data - use coefficient of variation as approximation
-            p_std_pct = (p['statistics'].get('baseline_std_ms', 0) /
-                        p['statistics']['baseline_mean_ms'] * 100) if 'baseline_std_ms' in p['statistics'] else 0
-            t_std_pct = (t['statistics'].get('baseline_std_ms', 0) /
-                        t['statistics']['baseline_mean_ms'] * 100) if 'baseline_std_ms' in t['statistics'] else 0
-            ttest_result = {
-                'p_value': None,
-                'significant': False,
-                'interpretation': 'Raw data not available'
-            }
-
-        # Calculate absolute overhead in microseconds
-        p_overhead_us = p['statistics'].get('overhead_ns', 0) / 1000  # ns to µs
-        t_overhead_us = t['statistics'].get('overhead_ns', 0) / 1000  # ns to µs
-
-        # Calculate std dev in microseconds if raw data available
-        if 'raw_data' in p and 'raw_data' in t:
-            p_overhead_us_std = np.std(p_overhead_pcts * p['statistics']['baseline_mean_ms'] * 10, ddof=1)  # pct * ms * 10 = µs
-            t_overhead_us_std = np.std(t_overhead_pcts * t['statistics']['baseline_mean_ms'] * 10, ddof=1)
-        else:
-            # Approximate from percentage std dev
-            p_overhead_us_std = p_std_pct * p['statistics']['baseline_mean_ms'] * 10  # pct * ms * 10 = µs
-            t_overhead_us_std = t_std_pct * t['statistics']['baseline_mean_ms'] * 10
+        # Perform pairwise statistical tests (first dataset vs others)
+        p_values = {}
+        if len(datasets) >= 2:
+            ref_raw = dataset_stats[reference.name]['raw_data']
+            if ref_raw:
+                ref_profiled = np.array(ref_raw['profiled_times_ms'])
+                for ds in datasets[1:]:
+                    comp_raw = dataset_stats[ds.name]['raw_data']
+                    if comp_raw:
+                        comp_profiled = np.array(comp_raw['profiled_times_ms'])
+                        try:
+                            ttest_result = perform_welch_ttest(
+                                ref_profiled / 1000,  # Convert to seconds
+                                comp_profiled / 1000
+                            )
+                            p_values[ds.name] = ttest_result['p_value']
+                        except ImportError:
+                            p_values[ds.name] = None
 
         comparison = {
             'key': key,
-            'scenario': p['scenario'],
-            'multiplier': p['multiplier'],
-            'method': p['method'],
-            'prototype_overhead_pct': p['statistics']['overhead_pct'],
-            'prototype_std_pct': p_std_pct,
-            'prototype_overhead_us': p_overhead_us,
-            'prototype_overhead_us_std': p_overhead_us_std,
-            'threadsafe_overhead_pct': t['statistics']['overhead_pct'],
-            'threadsafe_std_pct': t_std_pct,
-            'threadsafe_overhead_us': t_overhead_us,
-            'threadsafe_overhead_us_std': t_overhead_us_std,
-            'difference_pct': t['statistics']['overhead_pct'] - p['statistics']['overhead_pct'],
-            'p_value': ttest_result['p_value'],
-            'significant': ttest_result['significant'],
+            'scenario': ref_data['scenario'],
+            'multiplier': ref_data['multiplier'],
+            'method': ref_data['method'],
+            'datasets': dataset_stats,
+            'p_values': p_values,
         }
         comparisons.append(comparison)
 
     return comparisons
 
 
-def create_bar_chart(comparisons: List[Dict], output_path: Path, multiplier: int):
-    """Create bar chart comparing prototype vs thread-safe for specific multiplier."""
+def create_bar_chart(comparisons: List[Dict], datasets: List[Dataset], output_path: Path, multiplier: int):
+    """
+    Create bar chart comparing multiple datasets for specific multiplier.
+
+    Args:
+        comparisons: List of comparison dictionaries
+        datasets: List of Dataset objects being compared
+        output_path: Path to save the chart
+        multiplier: Workload multiplier to filter by (10, 100, etc.)
+    """
     # Filter by multiplier
     data = [c for c in comparisons if c['multiplier'] == multiplier]
-    
+
     # Group by scenario and method
     scenarios = ['tiny', 'small', 'medium', 'large']
     methods = ['decorator', 'context_manager']
-    
+
     # Prepare data
     x = np.arange(len(scenarios))
-    width = 0.35
-    
+    n_datasets = len(datasets)
+
+    # Calculate bar width based on number of datasets
+    total_width = 0.8  # Total width for all bars in a group
+    width = total_width / n_datasets
+
+    # Generate colors for each dataset
+    colors = plt.cm.tab10(np.linspace(0, 0.9, n_datasets))
+
+    # Dynamic title based on number of datasets
+    if n_datasets == 2:
+        title = f'{datasets[0].name} vs {datasets[1].name} Performance (x{multiplier} multiplier)'
+    else:
+        title = f'Multi-Version Performance Comparison (x{multiplier} multiplier)'
+
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle(f'Prototype vs Thread-Safe Performance (x{multiplier} multiplier)', fontsize=14, fontweight='bold')
-    
+    fig.suptitle(title, fontsize=14, fontweight='bold')
+
     for idx, method in enumerate(methods):
         ax = axes[idx]
 
-        prototype_values = []
-        threadsafe_values = []
-        prototype_errors = []
-        threadsafe_errors = []
-        prototype_pcts = []
-        threadsafe_pcts = []
-        p_values = []
+        # Collect data for each dataset
+        all_bars = []
+        for ds_idx, ds in enumerate(datasets):
+            values = []
+            errors = []
+            pcts = []
 
-        for scenario in scenarios:
-            # Find matching comparison
-            matching = [c for c in data if c['scenario'] == scenario and c['method'] == method]
-            if matching:
-                c = matching[0]
-                # Use absolute overhead in microseconds
-                prototype_values.append(abs(c['prototype_overhead_us']))  # abs for log scale
-                threadsafe_values.append(abs(c['threadsafe_overhead_us']))
-                prototype_errors.append(c.get('prototype_overhead_us_std', 0))
-                threadsafe_errors.append(c.get('threadsafe_overhead_us_std', 0))
-                # Keep percentages for labels
-                prototype_pcts.append(c['prototype_overhead_pct'])
-                threadsafe_pcts.append(c['threadsafe_overhead_pct'])
-                p_values.append(c.get('p_value'))
-            else:
-                prototype_values.append(0.01)  # Small value for log scale
-                threadsafe_values.append(0.01)
-                prototype_errors.append(0)
-                threadsafe_errors.append(0)
-                prototype_pcts.append(0)
-                threadsafe_pcts.append(0)
-                p_values.append(None)
+            for scenario in scenarios:
+                # Find matching comparison
+                matching = [c for c in data if c['scenario'] == scenario and c['method'] == method]
+                if matching and ds.name in matching[0]['datasets']:
+                    c = matching[0]
+                    stats = c['datasets'][ds.name]
+                    # Use absolute overhead in microseconds
+                    values.append(abs(stats['overhead_us']))  # abs for log scale
+                    errors.append(stats['overhead_us_std'])
+                    pcts.append(stats['overhead_pct'])
+                else:
+                    values.append(0.01)  # Small value for log scale
+                    errors.append(0)
+                    pcts.append(0)
 
-        # Create bars with error bars (±1 SD)
-        bars1 = ax.bar(x - width/2, prototype_values, width,
-                      yerr=prototype_errors, capsize=5,
-                      label='Prototype (v0.5.0)', color='#3498db',
-                      error_kw={'elinewidth': 1, 'capthick': 1})
-        bars2 = ax.bar(x + width/2, threadsafe_values, width,
-                      yerr=threadsafe_errors, capsize=5,
-                      label='Thread-Safe (v0.2.0)', color='#2ecc71',
-                      error_kw={'elinewidth': 1, 'capthick': 1})
+            # Calculate bar positions (centered around x)
+            offset = (ds_idx - (n_datasets - 1) / 2) * width
+            positions = x + offset
+
+            # Create bars with error bars (±1 SD)
+            bars = ax.bar(positions, values, width,
+                         yerr=errors, capsize=5,
+                         label=ds.name, color=colors[ds_idx],
+                         error_kw={'elinewidth': 1, 'capthick': 1})
+            all_bars.append((bars, values, pcts))
 
         # Customize with logarithmic scale
         ax.set_yscale('log')
@@ -191,117 +240,190 @@ def create_bar_chart(comparisons: List[Dict], output_path: Path, multiplier: int
         ax.set_ylim(bottom=0.01)  # Set minimum for log scale
 
         # Add value labels on bars with percentage in parentheses
-        for i, (bar1, bar2) in enumerate(zip(bars1, bars2)):
-            # Prototype value
-            height1 = bar1.get_height()
-            if height1 > 0.01:  # Only label if meaningful
-                label1 = f'{height1:.1f}µs\n({prototype_pcts[i]:+.2f}%)'
-                ax.text(bar1.get_x() + bar1.get_width()/2., height1 * 1.5,
-                       label1,
-                       ha='center', va='bottom', fontsize=6)
+        for bars, values, pcts in all_bars:
+            for i, bar in enumerate(bars):
+                height = bar.get_height()
+                if height > 0.01:  # Only label if meaningful
+                    label = f'{height:.1f}µs\n({pcts[i]:+.2f}%)'
+                    ax.text(bar.get_x() + bar.get_width()/2., height * 1.5,
+                           label,
+                           ha='center', va='bottom', fontsize=6)
 
-            # Thread-safe value
-            height2 = bar2.get_height()
-            if height2 > 0.01:
-                label2 = f'{height2:.1f}µs\n({threadsafe_pcts[i]:+.2f}%)'
-                ax.text(bar2.get_x() + bar2.get_width()/2., height2 * 1.5,
-                       label2,
-                       ha='center', va='bottom', fontsize=6)
-
-            # Add p-value annotation if available
-            if p_values[i] is not None:
-                max_height = max(height1, height2) * 3
-                p_val = p_values[i]
-                if p_val < 0.001:
-                    p_text = 'p<0.001***'
-                elif p_val < 0.01:
-                    p_text = f'p={p_val:.3f}**'
-                elif p_val < 0.05:
-                    p_text = f'p={p_val:.3f}*'
-                else:
-                    p_text = f'p={p_val:.2f}'
-
-                ax.text(x[i], max_height, p_text,
-                       ha='center', va='bottom', fontsize=6, style='italic')
-    
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
     plt.close()
     print(f"✅ Chart saved: {output_path}")
 
 
-def generate_markdown_report(comparisons: List[Dict], output_path: Path):
-    """Generate concise markdown comparison report."""
+def generate_markdown_report(comparisons: List[Dict], datasets: List[Dataset], output_path: Path):
+    """
+    Generate markdown comparison report for multiple datasets.
+
+    Args:
+        comparisons: List of comparison dictionaries
+        datasets: List of Dataset objects being compared
+        output_path: Path to save the report
+    """
+    from datetime import datetime
+
     lines = [
-        "# Performance Comparison: Prototype vs Thread-Safe",
+        f"# Performance Comparison: {' vs '.join(ds.name for ds in datasets)}",
         "",
-        "**Date**: 2025-11-16  ",
-        "**Prototype**: v0.5.0 (2025-11-02)  ",
-        "**Thread-Safe**: v0.2.0 (2025-11-16)  ",
+        f"**Date**: {datetime.now().strftime('%Y-%m-%d')}  ",
+    ]
+
+    # Add dataset information
+    for ds in datasets:
+        lines.append(f"**{ds.name}**: {ds.path}  ")
+
+    lines.extend([
         "",
         "---",
         "",
-        "## Executive Summary",
-        "",
-        "Thread-safe implementation **maintains or improves** prototype performance across all scenarios.",
-        "",
         "## Detailed Comparison",
         "",
-    ]
-    
+    ])
+
     # Group by multiplier
     for multiplier in [10, 100]:
         lines.append(f"### x{multiplier} Multiplier")
         lines.append("")
-        lines.append("| Scenario | Method | Prototype | Thread-Safe | Δ | Status |")
-        lines.append("|----------|--------|-----------|-------------|---|--------|")
-        
+
+        # Build table header dynamically
+        header = "| Scenario | Method |"
+        separator = "|----------|--------|"
+        for ds in datasets:
+            header += f" {ds.name} |"
+            separator += "--------|"
+        lines.append(header)
+        lines.append(separator)
+
         data = [c for c in comparisons if c['multiplier'] == multiplier]
         for c in sorted(data, key=lambda x: (x['scenario'], x['method'])):
             scenario = c['scenario'].capitalize()
             method = c['method'].capitalize()
-            proto = c['prototype_overhead_pct']
-            thread = c['threadsafe_overhead_pct']
-            diff = c['difference_pct']
-            
-            if diff < -0.1:
-                status = "✅ IMPROVED"
-            elif diff > 0.1:
-                status = "⚠️ SLOWER"
-            else:
-                status = "✅ MAINTAINED"
-            
-            lines.append(f"| {scenario} | {method} | {proto:.2f}% | {thread:.2f}% | {diff:+.2f}% | {status} |")
-        
+
+            row = f"| {scenario} | {method} |"
+            for ds in datasets:
+                if ds.name in c['datasets']:
+                    pct = c['datasets'][ds.name]['overhead_pct']
+                    row += f" {pct:.2f}% |"
+                else:
+                    row += " N/A |"
+
+            lines.append(row)
+
         lines.append("")
-    
+
     lines.append("## Charts")
     lines.append("")
     lines.append("![x10 Comparison](./comparison_x10.png)")
     lines.append("")
     lines.append("![x100 Comparison](./comparison_x100.png)")
     lines.append("")
-    
+
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-    
+
     print(f"✅ Report saved: {output_path}")
 
 
+def parse_arguments():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Compare performance baselines across multiple versions of Stichotrope.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Compare two versions (backward compatible)
+  python compare_baselines.py benchmarks/data/prototype benchmarks/data/v0.2.0
+
+  # Compare three versions
+  python compare_baselines.py benchmarks/data/prototype benchmarks/data/v0.2.0 benchmarks/data/v0.3.0
+
+  # Use custom names
+  python compare_baselines.py benchmarks/data/prototype benchmarks/data/v0.2.0 --names "Prototype" "Thread-Safe"
+
+  # Specify output directory
+  python compare_baselines.py benchmarks/data/prototype benchmarks/data/v0.2.0 --output benchmarks/reports/custom
+        """
+    )
+
+    parser.add_argument(
+        'datasets',
+        nargs='*',
+        type=Path,
+        help='Paths to dataset directories (each containing overhead_*.json files). '
+             'If not provided, defaults to prototype and v0.2.0.'
+    )
+
+    parser.add_argument(
+        '--names',
+        nargs='*',
+        type=str,
+        help='Optional custom names for datasets (must match number of datasets). '
+             'If not provided, names are auto-generated from directory stems.'
+    )
+
+    parser.add_argument(
+        '--output',
+        type=Path,
+        default=Path("benchmarks/reports/analysis_performance_benchmarking"),
+        help='Output directory for reports and charts (default: benchmarks/reports/analysis_performance_benchmarking)'
+    )
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    prototype_dir = Path("benchmarks/data/prototype")
-    threadsafe_dir = Path("benchmarks/data/v0.2.0")
-    output_dir = Path("benchmarks/reports/analysis_performance_benchmarking")
+    args = parse_arguments()
+
+    # Use defaults if no datasets provided (backward compatibility)
+    if not args.datasets:
+        dataset_paths = [
+            Path("benchmarks/data/prototype"),
+            Path("benchmarks/data/v0.2.0")
+        ]
+    else:
+        dataset_paths = args.datasets
+
+    # Validate dataset paths
+    for path in dataset_paths:
+        if not path.exists():
+            print(f"❌ Error: Dataset directory not found: {path}")
+            sys.exit(1)
+        if not path.is_dir():
+            print(f"❌ Error: Not a directory: {path}")
+            sys.exit(1)
+
+    # Validate names if provided
+    if args.names:
+        if len(args.names) != len(dataset_paths):
+            print(f"❌ Error: Number of names ({len(args.names)}) must match number of datasets ({len(dataset_paths)})")
+            sys.exit(1)
+        names = args.names
+    else:
+        names = [None] * len(dataset_paths)  # Auto-generate names
+
+    # Create Dataset objects
+    datasets = [Dataset(path, name) for path, name in zip(dataset_paths, names)]
+
+    print(f"📊 Comparing {len(datasets)} datasets:")
+    for ds in datasets:
+        print(f"  - {ds.name}: {ds.path}")
+
+    # Create output directory if needed
+    args.output.mkdir(parents=True, exist_ok=True)
 
     # Compare baselines
-    comparisons = compare_baselines(prototype_dir, threadsafe_dir)
+    comparisons = compare_baselines(datasets)
 
     # Generate charts
-    create_bar_chart(comparisons, output_dir / "comparison_x10.png", 10)
-    create_bar_chart(comparisons, output_dir / "comparison_x100.png", 100)
+    create_bar_chart(comparisons, datasets, args.output / "comparison_x10.png", 10)
+    create_bar_chart(comparisons, datasets, args.output / "comparison_x100.png", 100)
 
     # Generate report
-    generate_markdown_report(comparisons, output_dir / "02-prototype_comparison_v1.md")
+    generate_markdown_report(comparisons, datasets, args.output / "02-prototype_comparison_v1.md")
 
     print("\n✅ Comparison complete!")
 
