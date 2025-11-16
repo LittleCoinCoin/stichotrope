@@ -31,14 +31,21 @@ def test_thread_local_storage_isolation(profiler):
     """
 
     @profiler.track(0, "test_function")
-    def test_function(sleep_ms, iterations):
-        for _ in range(iterations):
-            time.sleep(sleep_ms / 1000.0)
+    def test_function(sleep_ms):
+        time.sleep(sleep_ms / 1000.0)
 
     # Execute in Thread 1: 10 calls, 1ms each
-    thread1 = threading.Thread(target=test_function, args=(1, 10))
+    def thread1_target():
+        for _ in range(10):
+            test_function(1)
+
     # Execute in Thread 2: 20 calls, 2ms each
-    thread2 = threading.Thread(target=test_function, args=(2, 20))
+    def thread2_target():
+        for _ in range(20):
+            test_function(2)
+
+    thread1 = threading.Thread(target=thread1_target)
+    thread2 = threading.Thread(target=thread2_target)
 
     thread1.start()
     thread2.start()
@@ -71,6 +78,8 @@ def test_thread_registration_in_global_registry(profiler):
 
     @profiler.track(0, "test_function")
     def test_function():
+        # Small delay to keep thread alive and prevent OS thread reuse
+        time.sleep(0.001)
         return 42
 
     # Execute in 3 different threads

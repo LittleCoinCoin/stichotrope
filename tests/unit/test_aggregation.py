@@ -30,16 +30,27 @@ def test_sequential_merge_correctness(profiler):
     """
 
     @profiler.track(0, "test_function")
-    def test_function(sleep_ms, iterations):
-        for _ in range(iterations):
-            time.sleep(sleep_ms / 1000.0)
+    def test_function(sleep_ms):
+        time.sleep(sleep_ms / 1000.0)
 
     # Thread 1: 10 calls, 1ms each
-    thread1 = threading.Thread(target=test_function, args=(1, 10))
+    def thread1_target():
+        for _ in range(10):
+            test_function(1)
+
     # Thread 2: 20 calls, 2ms each
-    thread2 = threading.Thread(target=test_function, args=(2, 20))
+    def thread2_target():
+        for _ in range(20):
+            test_function(2)
+
     # Thread 3: 30 calls, 3ms each
-    thread3 = threading.Thread(target=test_function, args=(3, 30))
+    def thread3_target():
+        for _ in range(30):
+            test_function(3)
+
+    thread1 = threading.Thread(target=thread1_target)
+    thread2 = threading.Thread(target=thread2_target)
+    thread3 = threading.Thread(target=thread3_target)
 
     thread1.start()
     thread2.start()
@@ -117,7 +128,7 @@ def test_multi_thread_aggregation_different_blocks(profiler):
     results = profiler.get_results()
 
     # Find blocks by name
-    blocks = {block.name: block for block in results.tracks[0].blocks}
+    blocks = {block.name: block for block in results.tracks[0].blocks.values()}
 
     assert blocks["block_a"].hit_count == 15  # 10 from T1 + 5 from T3
     assert blocks["block_b"].hit_count == 20  # 20 from T2
@@ -140,12 +151,15 @@ def test_empty_thread_handling(profiler):
     """
 
     @profiler.track(0, "test_function")
-    def test_function(iterations):
-        for _ in range(iterations):
-            pass
+    def test_function():
+        pass
 
     # Thread 1: executes profiled function (10 calls)
-    thread1 = threading.Thread(target=test_function, args=(10,))
+    def thread1_target():
+        for _ in range(10):
+            test_function()
+
+    thread1 = threading.Thread(target=thread1_target)
 
     # Thread 2: starts but doesn't execute profiled function (empty data)
     def empty_thread_target():
@@ -154,7 +168,11 @@ def test_empty_thread_handling(profiler):
     thread2 = threading.Thread(target=empty_thread_target)
 
     # Thread 3: executes profiled function (20 calls)
-    thread3 = threading.Thread(target=test_function, args=(20,))
+    def thread3_target():
+        for _ in range(20):
+            test_function()
+
+    thread3 = threading.Thread(target=thread3_target)
 
     thread1.start()
     thread2.start()
