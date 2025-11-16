@@ -304,6 +304,6 @@ def perform_welch_ttest(
     return {
         "t_statistic": float(t_statistic),
         "p_value": float(p_value),
-        "significant": significant,
+        "significant": bool(significant),
         "interpretation": interpretation,
     }
