@@ -289,9 +289,9 @@ def generate_markdown_report(comparisons: List[Dict], output_path: Path):
 
 
 if __name__ == "__main__":
-    prototype_dir = Path("__report__/perf/prototype_raw")
-    threadsafe_dir = Path("__report__/perf/v0.2.0_raw")
-    output_dir = Path("__reports__/analysis_performance_benchmarking")
+    prototype_dir = Path("benchmarks/data/prototype")
+    threadsafe_dir = Path("benchmarks/data/v0.2.0")
+    output_dir = Path("benchmarks/reports/analysis_performance_benchmarking")
 
     # Compare baselines
     comparisons = compare_baselines(prototype_dir, threadsafe_dir)

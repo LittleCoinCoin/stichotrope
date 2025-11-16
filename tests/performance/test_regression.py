@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 import pytest
 
-from tests.performance.statistics_utils import check_regression
+from benchmarks.statistics_utils import check_regression
 
 # Baseline directory (will be populated by test_overhead.py)
 BASELINE_DIR = Path(__file__).parent / "baselines"

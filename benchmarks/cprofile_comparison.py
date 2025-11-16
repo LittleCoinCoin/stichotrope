@@ -16,9 +16,7 @@ from io import StringIO
 from pathlib import Path
 from stichotrope import Profiler
 
-# Add tests/performance to path for statistics_utils
-sys.path.insert(0, str(Path(__file__).parent.parent / "tests" / "performance"))
-from statistics_utils import perform_welch_ttest
+from benchmarks.statistics_utils import perform_welch_ttest
 
 
 def simulate_work(duration_ms: float):

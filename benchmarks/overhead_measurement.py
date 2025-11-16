@@ -11,11 +11,11 @@ from pathlib import Path
 
 import pytest
 
-from tests.performance.statistics_utils import (
+from benchmarks.statistics_utils import (
     calculate_overhead_statistics,
     format_overhead_report,
 )
-from tests.performance.workloads import (
+from benchmarks.workloads import (
     create_workload_variants,
     get_all_scenarios,
     get_workload_scenario,
