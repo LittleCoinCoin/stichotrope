@@ -4,6 +4,9 @@
 # design reporting
 Laghari
 
+# older perf files
+__report__/perf/archive
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

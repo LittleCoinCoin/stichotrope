@@ -60,9 +60,8 @@ class TestPerformanceRegression:
 
         print(f"\nRegression check: {message}")
 
-        # This test doesn't fail, just reports
-        # In CI, we could make this fail to block merges
-        assert not is_regression or True  # Always pass for now
+        # Fail on regression to enforce performance standards
+        assert not is_regression, message
 
     def test_load_baseline_if_exists(self):
         """
