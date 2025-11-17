@@ -1,6 +1,6 @@
 # Performance Comparison: Prototype vs v0.2
 
-**Date**: 2025-11-16  
+**Date**: 2025-11-18  
 **Prototype**: benchmarks\data\prototype  
 **v0.2**: benchmarks\data\v0.2.0  
 
