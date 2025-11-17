@@ -186,9 +186,9 @@ def create_bar_chart(comparisons: List[Dict], datasets: List[Dataset], output_pa
 
     # Dynamic title based on number of datasets
     if n_datasets == 2:
-        title = f'{datasets[0].name} vs {datasets[1].name} Performance (x{multiplier} multiplier)'
+        title = f'{datasets[0].name} vs {datasets[1].name} Overhead (x{multiplier} multiplier)'
     else:
-        title = f'Multi-Version Performance Comparison (x{multiplier} multiplier)'
+        title = f'Multi-Version Overhead Comparison (x{multiplier} multiplier)'
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     fig.suptitle(title, fontsize=14, fontweight='bold')
@@ -200,9 +200,7 @@ def create_bar_chart(comparisons: List[Dict], datasets: List[Dataset], output_pa
         all_bars = []
         for ds_idx, ds in enumerate(datasets):
             values = []
-            errors_lower = []
-            errors_upper = []
-            pcts = []
+            errors = []
 
             for scenario in scenarios:
                 # Find matching comparison
@@ -210,59 +208,44 @@ def create_bar_chart(comparisons: List[Dict], datasets: List[Dataset], output_pa
                 if matching and ds.name in matching[0]['datasets']:
                     c = matching[0]
                     stats = c['datasets'][ds.name]
-                    # Use absolute overhead in microseconds
-                    mean_val = abs(stats['overhead_us'])  # abs for log scale
-                    std_val = stats['overhead_us_std']
+                    # Use overhead percentage
+                    mean_val = stats['overhead_pct']
+                    std_val = stats['std_pct']
 
                     values.append(mean_val)
-
-                    # For log scale, calculate asymmetric error bars
-                    # Lower error: distance from mean to (mean - σ), but can't go below 0.01
-                    lower_bound = max(0.01, mean_val - std_val)
-                    errors_lower.append(mean_val - lower_bound)
-
-                    # Upper error: distance from mean to (mean + σ)
-                    errors_upper.append(std_val)
-
-                    pcts.append(stats['overhead_pct'])
+                    errors.append(std_val)
                 else:
-                    values.append(0.01)  # Small value for log scale
-                    errors_lower.append(0)
-                    errors_upper.append(0)
-                    pcts.append(0)
+                    values.append(0)
+                    errors.append(0)
 
             # Calculate bar positions (centered around x)
             offset = (ds_idx - (n_datasets - 1) / 2) * width
             positions = x + offset
 
-            # Create bars with asymmetric error bars for log scale (±1 SD)
-            # yerr format: [[lower_errors], [upper_errors]]
-            yerr = np.array([errors_lower, errors_upper])
+            # Create bars with error bars (±1 SD)
             bars = ax.bar(positions, values, width,
-                         yerr=yerr, capsize=5,
+                         yerr=errors, capsize=5,
                          label=ds.name, color=colors[ds_idx],
                          error_kw={'elinewidth': 1, 'capthick': 1})
-            all_bars.append((bars, values, pcts))
+            all_bars.append((bars, values))
 
-        # Customize with logarithmic scale
-        ax.set_yscale('log')
-        ax.set_ylabel('Absolute Overhead (µs) ± 1 SD', fontweight='bold')
+        # Customize
+        ax.set_ylabel('Overhead (%)', fontweight='bold')
         ax.set_title(f'{method.replace("_", " ").title()}', fontweight='bold')
         ax.set_xticks(x)
         ax.set_xticklabels([s.capitalize() for s in scenarios])
         ax.legend()
-        ax.grid(axis='y', alpha=0.3, which='both')
-        ax.set_ylim(bottom=0.01)  # Set minimum for log scale
+        ax.grid(axis='y', alpha=0.3)
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
 
-        # Add value labels on bars with percentage in parentheses
-        for bars, values, pcts in all_bars:
+        # Add value labels on bars
+        for bars, values in all_bars:
             for i, bar in enumerate(bars):
                 height = bar.get_height()
-                if height > 0.01:  # Only label if meaningful
-                    label = f'{height:.1f}µs\n({pcts[i]:+.2f}%)'
-                    ax.text(bar.get_x() + bar.get_width()/2., height * 1.5,
-                           label,
-                           ha='center', va='bottom', fontsize=6)
+                label = f'{height:+.2f}%'
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       label,
+                       ha='center', va='bottom' if height >= 0 else 'top', fontsize=7)
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
