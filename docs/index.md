@@ -11,6 +11,8 @@ Stichotrope is a native Python profiling library that provides a Python equivale
 - **Block-level profiling**: Fills the gap between function-level and line-level profiling
 - **Multi-track organization**: Logical grouping of profiling data for complex applications
 - **Explicit instrumentation**: Decorators and context managers for precise control
+- **Thread-safe**: Built-in support for multi-threaded applications
+- **Low overhead**: ≤1% overhead for functions ≥1ms (verified)
 - **Zero overhead when disabled**: Runtime enable/disable with no performance impact
 - **CppProfiler-compatible**: Familiar API for users of CppProfiler
 - **Export capabilities**: CSV and JSON export for analysis and visualization
@@ -41,8 +43,8 @@ profiler.print_results()
 
 ## Installation
 
-!!! warning "Development Status"
-    Stichotrope is currently in active development (v0.1.x). The API may change before the v1.0.0 release.
+!!! info "Development Status"
+    Stichotrope v0.2.0 is in active development with verified performance characteristics. The API is stabilizing toward v1.0.0.
 
 ```bash
 # Install from PyPI (when available)
@@ -62,14 +64,15 @@ pip install -e .
 
 ## Project Status
 
-**Current Version**: v0.1.0-dev.1  
-**Phase**: Infrastructure Foundation (Phase 1)  
+**Current Version**: v0.2.0 (development)  
+**Phase**: Phase 2 - Core Architecture & Features (Milestone 2.1 complete)  
 **Target Release**: v1.0.0
 
-### Roadmap
+### Milestone Progress
 
 - ✅ **Phase 1**: Infrastructure Foundation (Testing, CI/CD, Packaging, Documentation)
-- ⏳ **Phase 2**: Core Architecture & Features (Thread-safety, Configuration, Validation)
+- ✅ **Phase 2.1**: Thread-Safe Architecture (v0.2.0 complete with verified performance)
+- ⏳ **Phase 2.2+**: Configuration System, Production Features
 - 📋 **Phase 3**: Release Preparation (Documentation completion, Final validation)
 
 ## License

@@ -11,8 +11,8 @@ This guide will help you get started with Stichotrope, a Python profiling librar
 
 ### Install from PyPI
 
-!!! warning "Development Status"
-    Stichotrope is currently in active development. The PyPI package will be available with the v1.0.0 release.
+!!! info "Development Status"
+    Stichotrope v0.2.0 is in active development with verified performance. The PyPI package will be available with the v1.0.0 release.
 
 ```bash
 pip install stichotrope
@@ -116,7 +116,54 @@ def check_cache(key):
     return cache.get(key)
 ```
 
-## Runtime Control
+## Multi-Threaded Applications
+
+Stichotrope supports profiling in multi-threaded applications. Each thread maintains its own profiling data, which can be aggregated when needed:
+
+```python
+from stichotrope import Profiler
+import threading
+
+profiler = Profiler("ThreadedApp")
+
+@profiler.track(0, "worker_task")
+def worker_task(task_id):
+    with profiler.block(1, "process_item"): 
+        # Simulate work
+        time.sleep(0.1)
+        print(f"Task {task_id} completed")
+
+# Create and start threads
+threads = [
+    threading.Thread(target=worker_task, args=(i,))
+    for i in range(4)
+]
+
+for thread in threads:
+    thread.start()
+
+# Wait for all threads to complete
+for thread in threads:
+    thread.join()
+
+# Get profiling results from all threads
+all_thread_results = profiler.get_all_thread_data()
+
+# Process results by thread
+for thread_id, results in all_thread_results.items():
+    print(f"\nThread {thread_id}:")
+    for track in results.tracks.values():
+        for block in track.blocks.values():
+            print(f"  {block.name}: {block.total_time_ns / 1e6:.2f}ms ({block.hit_count} calls)")
+```
+
+**Key methods for multi-threaded profiling:**
+
+- `get_results()`: Get profiling results for the current thread only
+- `get_all_thread_data()`: Get profiling results from all threads in a dictionary keyed by thread ID
+
+For more details on performance expectations and when to use Stichotrope, see [Performance Characteristics](./performance.md).
+
 
 ### Global Enable/Disable
 
@@ -217,5 +264,3 @@ export_csv(profiler.get_results(), "pipeline_profile.csv")
 
 - Explore the [API Reference](../api/index.md) for detailed documentation
 - Learn about [advanced features](../devs/index.md) and contributing
-- Check the [roadmap](../../index.md#roadmap) for upcoming features
-

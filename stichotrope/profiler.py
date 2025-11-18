@@ -7,6 +7,7 @@ and call-site caching.
 
 import functools
 import inspect
+import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any, Callable, Optional
@@ -19,10 +20,12 @@ _PROFILER_ENABLED = True
 
 # Global call-site cache: (track_idx, file, line, name) -> (profiler_id, block_idx)
 _CALL_SITE_CACHE: dict[tuple[int, str, int, str], tuple[int, int]] = {}
+_GLOBAL_CACHE_LOCK = threading.RLock()
 
 # Global profiler registry: profiler_id -> Profiler instance
 _PROFILER_REGISTRY: dict[int, "Profiler"] = {}
 _NEXT_PROFILER_ID = 0
+_REGISTRY_LOCK = threading.RLock()
 
 
 def set_global_enabled(enabled: bool) -> None:
@@ -70,14 +73,25 @@ class Profiler:
             name: Human-readable name for this profiler
         """
         global _NEXT_PROFILER_ID
-        self._profiler_id = _NEXT_PROFILER_ID
-        _NEXT_PROFILER_ID += 1
-        _PROFILER_REGISTRY[self._profiler_id] = self
+
+        # Register profiler with lock protection
+        with _REGISTRY_LOCK:
+            self._profiler_id = _NEXT_PROFILER_ID
+            _NEXT_PROFILER_ID += 1
+            _PROFILER_REGISTRY[self._profiler_id] = self
 
         self._name = name
-        self._tracks: dict[int, ProfileTrack] = {}
-        self._track_enabled: dict[int, bool] = {}  # Per-track enable/disable
-        self._next_block_idx: dict[int, int] = {}  # Next block index per track
+
+        # Thread-local storage for per-thread profiling data
+        self._thread_local = threading.local()
+
+        # Global lock protects _all_thread_data registry
+        self._global_lock = threading.RLock()
+
+        # Registry of all thread-local data: thread_id -> thread_local
+        self._all_thread_data: dict[int, Any] = {}
+
+        # Instance enable/disable flag
         self._started = True  # Profiler starts enabled by default
 
     def start(self) -> None:
@@ -92,6 +106,50 @@ class Profiler:
         """Check if profiler is started."""
         return self._started
 
+    def _get_thread_data(self) -> Any:
+        """
+        Get or initialize thread-local data for the current thread.
+
+        Uses hasattr pattern to avoid AttributeError on first access.
+        Registers thread in global registry on first access.
+        Caches thread_data reference in thread-local storage for fast access.
+
+        Returns:
+            Thread-local data object with tracks, track_enabled, next_block_idx
+        """
+        if not hasattr(self._thread_local, 'data'):
+            # First access from this thread - initialize thread-local storage
+            thread_id = threading.get_ident()
+            thread_name = threading.current_thread().name
+
+            # Register thread in global registry (LOCK REQUIRED)
+            # Create a data object to hold this thread's profiling data
+            with self._global_lock:
+                if thread_id not in self._all_thread_data:
+                    # Create a simple object to hold thread data
+                    class ThreadData:
+                        pass
+
+                    thread_data = ThreadData()
+                    thread_data.tracks = {}
+                    thread_data.track_enabled = {}
+                    thread_data.next_block_idx = {}
+                    thread_data.thread_id = thread_id
+                    thread_data.thread_name = thread_name
+
+                    self._all_thread_data[thread_id] = thread_data
+
+                else:
+                    # Thread was already registered (e.g., after clear())
+                    thread_data = self._all_thread_data[thread_id]
+
+            # Cache thread_data reference in thread-local storage for fast access
+            # This eliminates dict lookup on every _get_thread_data() call
+            self._thread_local.data = thread_data
+
+        # Return cached thread_data reference (fast - no dict lookup)
+        return self._thread_local.data
+
     def set_track_enabled(self, track_idx: int, enabled: bool) -> None:
         """
         Enable or disable a specific track.
@@ -100,7 +158,8 @@ class Profiler:
             track_idx: Track index
             enabled: True to enable, False to disable
         """
-        self._track_enabled[track_idx] = enabled
+        thread_data = self._get_thread_data()
+        thread_data.track_enabled[track_idx] = enabled
 
     def is_track_enabled(self, track_idx: int) -> bool:
         """
@@ -112,7 +171,8 @@ class Profiler:
         Returns:
             True if track is enabled (default: True)
         """
-        return self._track_enabled.get(track_idx, True)
+        thread_data = self._get_thread_data()
+        return thread_data.track_enabled.get(track_idx, True)
 
     def set_track_name(self, track_idx: int, name: str) -> None:
         """
@@ -122,21 +182,32 @@ class Profiler:
             track_idx: Track index
             name: Track name
         """
-        track = self._get_or_create_track(track_idx)
+        thread_data = self._get_thread_data()
+        track = self._get_or_create_track(thread_data, track_idx)
         track.track_name = name
 
-    def _get_or_create_track(self, track_idx: int) -> ProfileTrack:
-        """Get or create a track by index."""
-        if track_idx not in self._tracks:
-            self._tracks[track_idx] = ProfileTrack(track_idx=track_idx)
-            self._next_block_idx[track_idx] = 0
-        return self._tracks[track_idx]
+    def _get_or_create_track(self, thread_data: Any, track_idx: int) -> ProfileTrack:
+        """
+        Get or create a track by index in thread-local storage.
 
-    def _register_block(self, track_idx: int, name: str, file: str, line: int) -> int:
+        Args:
+            thread_data: Thread-local data object
+            track_idx: Track index
+
+        Returns:
+            ProfileTrack instance
+        """
+        if track_idx not in thread_data.tracks:
+            thread_data.tracks[track_idx] = ProfileTrack(track_idx=track_idx)
+            thread_data.next_block_idx[track_idx] = 0
+        return thread_data.tracks[track_idx]
+
+    def _register_block(self, thread_data: Any, track_idx: int, name: str, file: str, line: int) -> int:
         """
         Register a new profiling block and return its index.
 
         Args:
+            thread_data: Thread-local data object
             track_idx: Track index
             name: Block name
             file: Source file
@@ -145,9 +216,9 @@ class Profiler:
         Returns:
             Block index within the track
         """
-        track = self._get_or_create_track(track_idx)
-        block_idx = self._next_block_idx[track_idx]
-        self._next_block_idx[track_idx] += 1
+        track = self._get_or_create_track(thread_data, track_idx)
+        block_idx = thread_data.next_block_idx[track_idx]
+        thread_data.next_block_idx[track_idx] += 1
 
         track.add_block(block_idx, name, file, line)
         return block_idx
@@ -156,12 +227,15 @@ class Profiler:
         """
         Record execution time for a block.
 
+        HOT PATH - NO LOCKS. Uses thread-local data only.
+
         Args:
             track_idx: Track index
             block_idx: Block index
             elapsed_ns: Elapsed time in nanoseconds
         """
-        track = self._tracks.get(track_idx)
+        thread_data = self._get_thread_data()
+        track = thread_data.tracks.get(track_idx)
         if track is None:
             return
 
@@ -169,22 +243,90 @@ class Profiler:
         if block is not None:
             block.record_time(elapsed_ns)
 
-    def get_results(self) -> ProfilerResults:
+    def _aggregate_results(self) -> ProfilerResults:
         """
-        Get profiling results.
+        Aggregate profiling data from all threads.
+
+        Uses sequential merge algorithm (GIL-friendly).
+        Acquires _global_lock to safely iterate _all_thread_data.
 
         Returns:
-            ProfilerResults containing all tracks and blocks
+            ProfilerResults with aggregated data from all threads
         """
+        aggregated_tracks: dict[int, ProfileTrack] = {}
+
+        # Acquire lock to safely iterate all thread data
+        with self._global_lock:
+            # Iterate all threads and merge their data
+            for thread_id, thread_local in self._all_thread_data.items():
+                # Merge each track from this thread
+                for track_idx, source_track in thread_local.tracks.items():
+                    # Get or create aggregated track
+                    if track_idx not in aggregated_tracks:
+                        aggregated_tracks[track_idx] = ProfileTrack(
+                            track_idx=track_idx,
+                            track_name=source_track.track_name
+                        )
+
+                    aggregated_track = aggregated_tracks[track_idx]
+
+                    # Merge all blocks from source track
+                    for block_idx, source_block in source_track.blocks.items():
+                        self._merge_block(aggregated_track, block_idx, source_block)
+
         results = ProfilerResults(profiler_name=self._name)
-        results.tracks = self._tracks.copy()
+        results.tracks = aggregated_tracks
         return results
 
+    def _merge_block(self, aggregated_track: ProfileTrack, block_idx: int, source_block: Any) -> None:
+        """
+        Merge a source block into the aggregated track.
+
+        Args:
+            aggregated_track: Target track for aggregation
+            block_idx: Block index
+            source_block: Source ProfileBlock to merge
+        """
+        if block_idx not in aggregated_track.blocks:
+            # First occurrence of this block - add it
+            aggregated_track.add_block(
+                block_idx,
+                source_block.name,
+                source_block.file,
+                source_block.line
+            )
+            target_block = aggregated_track.blocks[block_idx]
+            target_block.hit_count = source_block.hit_count
+            target_block.total_time_ns = source_block.total_time_ns
+            target_block.min_time_ns = source_block.min_time_ns
+            target_block.max_time_ns = source_block.max_time_ns
+        else:
+            # Block already exists - merge statistics
+            target_block = aggregated_track.blocks[block_idx]
+            target_block.hit_count += source_block.hit_count
+            target_block.total_time_ns += source_block.total_time_ns
+            target_block.min_time_ns = min(target_block.min_time_ns, source_block.min_time_ns)
+            target_block.max_time_ns = max(target_block.max_time_ns, source_block.max_time_ns)
+
+    def get_results(self) -> ProfilerResults:
+        """
+        Get profiling results aggregated from all threads.
+
+        Returns:
+            ProfilerResults containing all tracks and blocks from all threads
+        """
+        return self._aggregate_results()
+
     def clear(self) -> None:
-        """Clear all profiling data."""
-        self._tracks.clear()
-        self._track_enabled.clear()
-        self._next_block_idx.clear()
+        """Clear all profiling data from all threads."""
+        # Clear global thread data registry
+        with self._global_lock:
+            self._all_thread_data.clear()
+
+        # Invalidate cached thread_data reference in current thread
+        # This ensures the thread re-initializes on next access
+        if hasattr(self._thread_local, 'data'):
+            delattr(self._thread_local, 'data')
 
     def track(self, track_idx: int, name: Optional[str] = None) -> Callable:
         """
@@ -224,14 +366,23 @@ class Profiler:
                 file = "<unknown>"
                 line = 0
 
-            # Check call-site cache
+            # Check call-site cache with lock protection
+            # We only cache the block_idx here, not register the block yet
+            # Block registration happens in each thread when wrapper is first executed
             cache_key = (track_idx, file, line, block_name)
-            if cache_key in _CALL_SITE_CACHE:
-                profiler_id, block_idx = _CALL_SITE_CACHE[cache_key]
-            else:
-                # Register block and cache
-                block_idx = self._register_block(track_idx, block_name, file, line)
-                _CALL_SITE_CACHE[cache_key] = (self._profiler_id, block_idx)
+            block_idx_container = [None]  # Use list to allow modification in wrapper
+
+            with _GLOBAL_CACHE_LOCK:
+                if cache_key in _CALL_SITE_CACHE:
+                    profiler_id, block_idx = _CALL_SITE_CACHE[cache_key]
+                    block_idx_container[0] = block_idx
+                else:
+                    # Allocate a block_idx without registering the block yet
+                    # We'll use a counter to allocate unique block indices
+                    # For now, use the cache size as the block_idx
+                    block_idx = len(_CALL_SITE_CACHE)
+                    _CALL_SITE_CACHE[cache_key] = (self._profiler_id, block_idx)
+                    block_idx_container[0] = block_idx
 
             # Store block_idx in function attribute for fast access
             @functools.wraps(func)
@@ -243,6 +394,18 @@ class Profiler:
                 # Level 3: Instance start/stop
                 if not self._started:
                     return func(*args, **kwargs)
+
+                # Get the cached block_idx
+                block_idx = block_idx_container[0]
+
+                # Ensure block exists in current thread's storage
+                thread_data = self._get_thread_data()
+                track = thread_data.tracks.get(track_idx)
+                if track is None or block_idx not in track.blocks:
+                    # Block not yet registered in this thread - register it
+                    track = self._get_or_create_track(thread_data, track_idx)
+                    if block_idx not in track.blocks:
+                        track.add_block(block_idx, block_name, file, line)
 
                 # Profile the function
                 start = get_time_ns()
@@ -298,14 +461,25 @@ class Profiler:
             file = "<unknown>"
             line = 0
 
-        # Check call-site cache
+        # Check call-site cache with lock protection
+        # We only cache the block_idx here, not register the block yet
         cache_key = (track_idx, file, line, name)
-        if cache_key in _CALL_SITE_CACHE:
-            profiler_id, block_idx = _CALL_SITE_CACHE[cache_key]
-        else:
-            # Register block and cache
-            block_idx = self._register_block(track_idx, name, file, line)
-            _CALL_SITE_CACHE[cache_key] = (self._profiler_id, block_idx)
+        with _GLOBAL_CACHE_LOCK:
+            if cache_key in _CALL_SITE_CACHE:
+                profiler_id, block_idx = _CALL_SITE_CACHE[cache_key]
+            else:
+                # Allocate a block_idx without registering the block yet
+                block_idx = len(_CALL_SITE_CACHE)
+                _CALL_SITE_CACHE[cache_key] = (self._profiler_id, block_idx)
+
+        # Ensure block exists in current thread's storage
+        thread_data = self._get_thread_data()
+        track = thread_data.tracks.get(track_idx)
+        if track is None or block_idx not in track.blocks:
+            # Block not yet registered in this thread - register it
+            track = self._get_or_create_track(thread_data, track_idx)
+            if block_idx not in track.blocks:
+                track.add_block(block_idx, name, file, line)
 
         # Profile the block
         start = get_time_ns()
@@ -351,9 +525,18 @@ class Profiler:
         print_results(results)
 
     def __repr__(self) -> str:
+        # Count unique tracks across all threads
+        track_indices = set()
+        thread_count = 0
+
+        with self._global_lock:
+            thread_count = len(self._all_thread_data)
+            for thread_data in self._all_thread_data.values():
+                track_indices.update(thread_data.tracks.keys())
+
         return (
-            f"Profiler(name={self._name!r}, tracks={len(self._tracks)}, "
-            f"started={self._started})"
+            f"Profiler(name={self._name!r}, tracks={len(track_indices)}, "
+            f"threads={thread_count}, started={self._started})"
         )
 
 
