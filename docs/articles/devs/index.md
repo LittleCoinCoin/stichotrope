@@ -4,8 +4,8 @@ Welcome to the Stichotrope developer documentation. This section provides inform
 
 ## Development Status
 
-**Current Phase**: Phase 1 - Infrastructure Foundation  
-**Current Version**: v0.1.0-dev.1  
+**Current Phase**: Phase 2 - Core Architecture & Features (Milestone 2.1 Complete)  
+**Current Version**: v0.2.0 (development)  
 **Target Release**: v1.0.0
 
 ## Development Setup
@@ -233,21 +233,30 @@ The documentation will be available at `http://127.0.0.1:8000`.
 
 See the [Product Roadmap](https://github.com/LittleCoinCoin/stichotrope/blob/dev/__design__/02-product_roadmap_v2.md) for detailed development plans.
 
-### Current Milestone
+### Recent Milestones
 
-**Milestone 1.4**: Documentation Infrastructure (In Progress)
+- ✅ **Phase 1**: Infrastructure Foundation (Complete)
+  - Testing framework and CI/CD pipeline
+  - Documentation infrastructure
+  
+- ✅ **Milestone 2.1**: Thread-Safe Architecture (Complete)
+  - Thread-safe profiler implementation with verified performance (v0.2.0)
+  - ≤1% overhead for functions ≥1ms
+
+### Current Focus
+
+**Milestone 2.2+**: Configuration System & Production Features
 
 ### Upcoming Milestones
 
-- **Phase 2**: Core Architecture & Features
-  - Thread-safe architecture redesign
-  - Configuration system (TOML)
+- **Phase 2 (continued)**: Configuration and Validation
+  - TOML-based configuration system
   - Input validation and error handling
-  - Repetition testing framework
+  - Production feature development
 
 - **Phase 3**: Release Preparation
-  - Documentation completion
-  - Final validation
+  - Final documentation completion
+  - v1.0.0 release candidate testing
   - v1.0.0 release
 
 ## Resources

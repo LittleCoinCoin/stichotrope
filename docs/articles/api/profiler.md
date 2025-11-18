@@ -125,6 +125,37 @@ def process_pipeline(data):
     return transformed
 ```
 
+### Multi-Threaded Usage
+
+```python
+from stichotrope import Profiler
+import threading
+
+profiler = Profiler("MultiThreadApp")
+
+@profiler.track(0, "worker_task")
+def worker_task(task_id):
+    # Profiling in thread
+    with profiler.block(1, "task_processing"):
+        process(task_id)
+
+# Start multiple threads
+threads = [
+    threading.Thread(target=worker_task, args=(i,))
+    for i in range(5)
+]
+
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+# Retrieve results from all threads
+all_results = profiler.get_all_thread_data()
+for thread_id, thread_results in all_results.items():
+    print(f"Thread {thread_id}: {thread_results}")
+```
+
 ## Implementation Details
 
 ### Call-Site Caching
@@ -133,14 +164,24 @@ The profiler uses call-site caching to minimize overhead. Each unique call site 
 
 ### Thread Safety
 
-!!! warning "Thread Safety - Coming in Phase 2"
-    The current implementation (v0.1.x) is not thread-safe. Thread-safe architecture redesign is planned for Phase 2 (Milestone 2.1).
+The Profiler is thread-safe by design in v0.2.0+. Each thread maintains its own profiling data independently, with a thread-safe aggregation mechanism for retrieving cross-thread results.
+
+**Per-thread operations** (lock-free):
+- `track()` decorator on functions
+- `block()` context manager
+- `get_results()` for current thread's data
+
+**Cross-thread operations** (synchronized):
+- `get_all_thread_data()` for aggregating results across threads
+
+For multi-threaded applications, use `get_all_thread_data()` to retrieve and aggregate profiling results from all threads.
 
 ### Performance Characteristics
 
-- **Overhead when enabled**: ~0.02-0.68% for blocks ≥1ms (measured on prototype)
+- **Overhead when enabled**: ≤1% for blocks over 1ms. The raw overhead is typically 4µs so profiling anything within the same order of magnitude will result in significant timing distortions.
 - **Overhead when disabled**: Zero overhead (decorators return identity functions)
-- **Memory usage**: Minimal (one ProfileBlock per profiled execution)
+
+For detailed performance analysis and benchmarking methodology, see [Performance Documentation](../users/performance.md).
 
 ## See Also
 

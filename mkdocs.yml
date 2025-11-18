@@ -38,8 +38,10 @@ nav:
   - Home: index.md
   - Users:
       - Getting Started: articles/users/GettingStarted.md
+      - Performance: articles/users/performance.md
   - Developers:
       - Overview: articles/devs/index.md
+      - Architecture: articles/devs/architecture.md
   - API Reference:
       - Overview: articles/api/index.md
       - Profiler: articles/api/profiler.md
