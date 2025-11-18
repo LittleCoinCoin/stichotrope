@@ -33,24 +33,29 @@ def test_hot_path_overhead_measurement(profiler):
     - Target: 0.02-0.25% overhead for ≥1ms blocks
     """
 
-    # Fast function (< 1μs execution time)
-    def fast_function():
+    # Realistic function (≥1ms execution time)
+    # Using sleep to simulate realistic workload
+    def realistic_function():
+        time.sleep(0.001)  # 1ms workload
         return 42
 
     # Measure baseline (unprofiled) execution time
+    # Reduced iterations since each takes 1ms
+    iterations = 100
     start_time = time.perf_counter()
-    for _ in range(100_000):
-        fast_function()
+    for _ in range(iterations):
+        realistic_function()
     baseline_time = time.perf_counter() - start_time
 
     # Measure profiled execution time
-    @profiler.track(0, "fast_function")
-    def profiled_fast_function():
+    @profiler.track(0, "realistic_function")
+    def profiled_realistic_function():
+        time.sleep(0.001)  # 1ms workload
         return 42
 
     start_time = time.perf_counter()
-    for _ in range(100_000):
-        profiled_fast_function()
+    for _ in range(iterations):
+        profiled_realistic_function()
     profiled_time = time.perf_counter() - start_time
 
     # Calculate overhead percentage
@@ -65,6 +70,7 @@ def test_hot_path_overhead_measurement(profiler):
     print(f"\nHot path overhead: {overhead_pct:.4f}%")
     print(f"Baseline time: {baseline_time:.6f}s")
     print(f"Profiled time: {profiled_time:.6f}s")
+    print(f"Iterations: {iterations}")
 
 
 @pytest.mark.performance

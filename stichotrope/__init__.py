@@ -31,7 +31,7 @@ try:
     __version__ = version(__package__ or __name__)
 except Exception:
     # Fallback for development or when package is not installed
-    __version__ = "0.1.0"
+    __version__ = "0.2.0"
 
 __all__ = [
     "__version__",

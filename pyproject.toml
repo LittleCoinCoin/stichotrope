@@ -47,6 +47,8 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-timeout>=2.1.0",  # Deadlock detection for thread-safety tests
     "psutil>=5.9.0",          # Memory usage measurement for performance tests
+    "scipy>=1.11.0",          # Statistical testing for performance benchmarks
+    "matplotlib>=3.8.0",      # Visualization for performance comparisons
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
@@ -56,6 +58,7 @@ docs = [
     "mkdocs>=1.5.0",
     "mkdocstrings[python]>=0.24.0",
     "mkdocs-material>=9.5.0",
+    "mkdocs-print-site-plugin>=2.8"
 ]
 
 [project.urls]

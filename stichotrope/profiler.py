@@ -525,9 +525,18 @@ class Profiler:
         print_results(results)
 
     def __repr__(self) -> str:
+        # Count unique tracks across all threads
+        track_indices = set()
+        thread_count = 0
+
+        with self._global_lock:
+            thread_count = len(self._all_thread_data)
+            for thread_data in self._all_thread_data.values():
+                track_indices.update(thread_data.tracks.keys())
+
         return (
-            f"Profiler(name={self._name!r}, tracks={len(self._tracks)}, "
-            f"started={self._started})"
+            f"Profiler(name={self._name!r}, tracks={len(track_indices)}, "
+            f"threads={thread_count}, started={self._started})"
         )
 
 
